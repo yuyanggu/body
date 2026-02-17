@@ -494,6 +494,289 @@ canvas {
 }
 
 /* =========================================
+   Exercise Selection Overlay
+   ========================================= */
+
+#exercise-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 5, 8, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+
+#exercise-overlay.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.exercise-overlay-inner {
+    max-width: 720px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.exercise-overlay-title {
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, #fff 30%, #a5b4fc 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.exercise-overlay-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+    margin-top: -8px;
+}
+
+#exercise-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    width: 100%;
+}
+
+.exercise-card {
+    backdrop-filter: blur(24px) saturate(120%);
+    -webkit-backdrop-filter: blur(24px) saturate(120%);
+    background: linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    border-left: 1px solid var(--glass-highlight);
+    border-radius: 20px;
+    padding: 24px 20px;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.exercise-card:hover {
+    background: linear-gradient(145deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%);
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.2);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 30px rgba(102,126,234,0.1);
+}
+
+.exercise-card-icon {
+    font-size: 28px;
+    line-height: 1;
+}
+
+.exercise-card-name {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    color: var(--text-main);
+}
+
+.exercise-card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 300;
+    line-height: 1.5;
+}
+
+.exercise-overlay-footer {
+    margin-top: 8px;
+}
+
+/* =========================================
+   API Key Modal
+   ========================================= */
+
+#api-key-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+#api-key-modal.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.api-key-modal-inner {
+    position: relative;
+    width: 380px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.api-key-modal-title {
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+}
+
+.api-key-modal-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 300;
+    line-height: 1.5;
+}
+
+#api-key-input {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: var(--text-main);
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+#api-key-input:focus {
+    border-color: rgba(102, 126, 234, 0.5);
+}
+
+#api-key-input::placeholder {
+    color: rgba(255,255,255,0.25);
+}
+
+.api-key-modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+/* =========================================
+   Exercise HUD
+   ========================================= */
+
+#exercise-hud {
+    top: 32px;
+    left: 32px;
+    width: 260px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: opacity 0.4s ease, visibility 0.4s ease, all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+#exercise-hud.hidden {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+#hud-exercise-name {
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    background: linear-gradient(135deg, #fff 30%, #a5b4fc 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+#hud-rep-count, #hud-angle-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.hud-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+#hud-reps {
+    font-size: 32px;
+    font-weight: 200;
+    color: var(--text-main);
+    line-height: 1;
+}
+
+#hud-angle {
+    font-size: 18px;
+    font-weight: 300;
+    color: var(--text-muted);
+}
+
+#hud-form-cue {
+    font-size: 12px;
+    color: rgba(251, 113, 133, 0.9);
+    font-weight: 400;
+    min-height: 18px;
+    transition: opacity 0.3s ease;
+}
+
+#hud-ai-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 300;
+    font-style: italic;
+    line-height: 1.5;
+    min-height: 20px;
+    transition: opacity 0.4s ease;
+}
+
+#hud-voice-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+    transition: opacity 0.3s ease;
+}
+
+#hud-voice-indicator.hidden {
+    opacity: 0;
+}
+
+.voice-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #a78bfa;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
+    animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+/* =========================================
+   Utility
+   ========================================= */
+
+.hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* =========================================
    Responsive
    ========================================= */
 

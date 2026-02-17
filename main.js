@@ -1,6 +1,7 @@
 // ============================================================
-// Body Neural Network — main.js
+// Movement Dialogue — main.js
 // Body-tracking shader with interior fill & Anadol-style particles
+// + Exercise analysis, AI companion, and voice feedback
 // ============================================================
 
 import * as THREE from 'three';
@@ -10,6 +11,9 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
+import { EXERCISES, ExerciseAnalyzer } from './exercises.js';
+import { AICompanion } from './ai-companion.js';
+
 // ============================================================
 // 1. CONSTANTS & CONFIGURATION
 // ============================================================
@@ -18,7 +22,11 @@ const config = {
     paused: false,
     activePaletteIndex: 0,
     sensitivity: 0.4,
+    appMode: 'select',  // 'select' | 'exercise' | 'summary'
 };
+
+const exerciseAnalyzer = new ExerciseAnalyzer();
+const aiCompanion = new AICompanion();
 
 const KEYPOINT_NAMES = [
     'nose', 'left_eye', 'right_eye', 'left_ear', 'right_ear',
@@ -1225,11 +1233,11 @@ function clickPulse(cx, cy) {
 }
 
 renderer.domElement.addEventListener('click', e => {
-    if (e.target.closest('.glass-panel,#control-buttons')) return;
+    if (e.target.closest('.glass-panel,#control-buttons,#exercise-overlay,#api-key-modal,.exercise-card')) return;
     if (!config.paused) clickPulse(e.clientX, e.clientY);
 });
 renderer.domElement.addEventListener('touchstart', e => {
-    if (e.target.closest('.glass-panel,#control-buttons')) return;
+    if (e.target.closest('.glass-panel,#control-buttons,#exercise-overlay,#api-key-modal,.exercise-card')) return;
     e.preventDefault();
     if (e.touches.length && !config.paused) clickPulse(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: false });
@@ -1334,7 +1342,129 @@ function updateTheme(pi) {
 // 17. UI SETUP
 // ============================================================
 
+// ---- Exercise Selection & HUD ----
+
+function populateExerciseGrid() {
+    const grid = document.getElementById('exercise-grid');
+    EXERCISES.forEach(ex => {
+        const card = document.createElement('div');
+        card.className = 'exercise-card';
+        card.innerHTML = `
+            <div class="exercise-card-icon">${ex.icon}</div>
+            <div class="exercise-card-name">${ex.name}</div>
+            <div class="exercise-card-desc">${ex.description}</div>
+        `;
+        card.addEventListener('click', () => startExercise(ex));
+        grid.appendChild(card);
+    });
+}
+
+function startExercise(exercise) {
+    config.appMode = 'exercise';
+    exerciseAnalyzer.start(exercise);
+
+    // UI transitions
+    document.getElementById('exercise-overlay').classList.add('hidden');
+    document.getElementById('exercise-hud').classList.remove('hidden');
+    document.getElementById('instructions-container').classList.add('hidden');
+    document.getElementById('end-session-btn').classList.remove('hidden');
+
+    // Set HUD content
+    document.getElementById('hud-exercise-name').textContent = exercise.name;
+    document.getElementById('hud-reps').textContent = '0';
+    document.getElementById('hud-angle').textContent = '—';
+    document.getElementById('hud-form-cue').textContent = '';
+    document.getElementById('hud-ai-text').textContent = '';
+
+    // AI greeting
+    if (aiCompanion.hasKey) {
+        aiCompanion.greet(exercise.name);
+    }
+}
+
+function endSession() {
+    const summary = exerciseAnalyzer.stop();
+    aiCompanion.reset();
+    config.appMode = 'select';
+
+    // UI transitions
+    document.getElementById('exercise-hud').classList.add('hidden');
+    document.getElementById('end-session-btn').classList.add('hidden');
+    document.getElementById('exercise-overlay').classList.remove('hidden');
+    document.getElementById('hud-voice-indicator').classList.add('hidden');
+}
+
+function updateExerciseHUD(state) {
+    if (!state) return;
+    document.getElementById('hud-reps').textContent = state.repCount;
+    document.getElementById('hud-angle').textContent = state.currentAngle > 0 ? `${state.currentAngle}°` : '—';
+    document.getElementById('hud-form-cue').textContent = state.formCue || '';
+
+    // Voice indicator
+    const voiceInd = document.getElementById('hud-voice-indicator');
+    if (aiCompanion.isSpeaking) voiceInd.classList.remove('hidden');
+    else voiceInd.classList.add('hidden');
+}
+
+// ---- API Key Modal ----
+
+function setupApiKeyUI() {
+    const btn = document.getElementById('api-key-btn');
+    const modal = document.getElementById('api-key-modal');
+    const input = document.getElementById('api-key-input');
+    const saveBtn = document.getElementById('api-key-save');
+    const cancelBtn = document.getElementById('api-key-cancel');
+    const label = document.getElementById('api-key-btn-label');
+
+    // Load existing key
+    const stored = localStorage.getItem('openai_api_key');
+    if (stored) {
+        aiCompanion.apiKey = stored;
+        label.textContent = 'API Key Set';
+    }
+
+    btn.addEventListener('click', e => {
+        e.stopPropagation();
+        input.value = aiCompanion.apiKey || '';
+        modal.classList.remove('hidden');
+    });
+
+    saveBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const key = input.value.trim();
+        aiCompanion.apiKey = key;
+        label.textContent = key ? 'API Key Set' : 'Set API Key';
+        modal.classList.add('hidden');
+    });
+
+    cancelBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        modal.classList.add('hidden');
+    });
+
+    modal.addEventListener('click', e => {
+        if (e.target === modal) modal.classList.add('hidden');
+    });
+}
+
+// ---- AI text display callback ----
+
+aiCompanion.onTextUpdate = (text) => {
+    const el = document.getElementById('hud-ai-text');
+    if (el) el.textContent = text;
+};
+
 function setupUI() {
+    // Exercise grid
+    populateExerciseGrid();
+    setupApiKeyUI();
+
+    // End session button
+    document.getElementById('end-session-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        endSession();
+    });
+
     document.querySelectorAll('.theme-button').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
@@ -1403,6 +1533,8 @@ function updateStatusUI() {
 const clock = new THREE.Clock();
 let prevTime = 0;
 
+let _lastExerciseState = null;
+
 function animate() {
     requestAnimationFrame(animate);
     const t = clock.getElapsedTime();
@@ -1422,6 +1554,40 @@ function animate() {
         updateAnadolParticles(t, dt);
         updateUniforms(t);
         checkMovementPulses(t);
+
+        // Exercise analysis (during exercise mode)
+        if (config.appMode === 'exercise' && bodyState.isTracking) {
+            const exState = exerciseAnalyzer.update(bodyState);
+            if (exState) {
+                _lastExerciseState = exState;
+                updateExerciseHUD(exState);
+
+                // Trigger pulse on rep completion
+                if (exState.repCompleted && exerciseAnalyzer.exercise) {
+                    const targetKps = exerciseAnalyzer.exercise.targetKeypoints;
+                    // Pulse from the centroid of target keypoints
+                    const centroid = new THREE.Vector3();
+                    let count = 0;
+                    for (const ki of targetKps) {
+                        if (bodyState.keypoints[ki].confidence > CONFIDENCE_THRESHOLD) {
+                            centroid.add(bodyState.keypoints[ki].position3D);
+                            count++;
+                        }
+                    }
+                    if (count > 0) {
+                        centroid.divideScalar(count);
+                        triggerPulse(centroid, t);
+                    }
+                }
+
+                // AI companion update (async, non-blocking)
+                aiCompanion.update(exState, {
+                    velocity: bodyState.globalVelocity,
+                    jitter: bodyState.globalJitter,
+                    rangeOfMotion: bodyState.globalRangeOfMotion,
+                });
+            }
+        }
     }
 
     starField.rotation.y += .0002;
@@ -1447,7 +1613,11 @@ async function init() {
         sub.textContent = 'Loading MoveNet model...';
         await setupPoseDetection();
         sub.textContent = 'Ready!';
-        setTimeout(() => overlay.classList.add('hidden'), 600);
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            // Show exercise selection overlay
+            document.getElementById('exercise-overlay').classList.remove('hidden');
+        }, 600);
     } catch (err) {
         console.error('Init error:', err);
         sub.textContent = `Error: ${err.message || 'Could not start camera or load model.'}`;
