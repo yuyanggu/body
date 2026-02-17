@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Body Neural Network</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Hidden video element for pose detection input -->
+    <video id="webcam" autoplay playsinline muted style="display:none;"></video>
+
+    <!-- Three.js canvas -->
+    <canvas id="neural-network-canvas"></canvas>
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+        <div class="loading-title">Body Neural Network</div>
+        <div class="loading-subtitle">Loading pose detection model...</div>
+        <div class="loading-bar"><div class="loading-progress"></div></div>
+    </div>
+
+    <!-- Instructions -->
+    <div id="instructions-container" class="glass-panel">
+        <div id="instruction-title">Body Neural Network</div>
+        <div class="instruction-text">
+            Move your body to shape the network.<br>
+            Expansive gestures amplify the energy.
+        </div>
+    </div>
+
+    <!-- Theme selector + sensitivity -->
+    <div id="theme-selector" class="glass-panel">
+        <div style="flex: 1;">
+            <div id="theme-selector-title">Crystal Theme</div>
+            <div class="theme-grid">
+                <button class="theme-button active" id="theme-1" data-theme="0" aria-label="Purple Nebula"></button>
+                <button class="theme-button" id="theme-2" data-theme="1" aria-label="Sunset Fire"></button>
+                <button class="theme-button" id="theme-3" data-theme="2" aria-label="Ocean Aurora"></button>
+            </div>
+        </div>
+        <div id="sensitivity-controls" style="flex: 1;">
+            <div class="sensitivity-label">
+                <span>Sensitivity</span>
+                <span id="sensitivity-value">70%</span>
+            </div>
+            <input type="range" min="10" max="100" value="70"
+                class="sensitivity-slider" id="sensitivity-slider"
+                aria-label="Movement Sensitivity"
+                oninput="this.style.setProperty('--val', this.value + '%')">
+        </div>
+    </div>
+
+    <!-- Webcam preview -->
+    <div id="webcam-preview" class="glass-panel">
+        <video id="webcam-display" autoplay playsinline muted></video>
+        <div id="tracking-status">
+            <span class="status-dot"></span>
+            <span id="tracking-text">Initializing...</span>
+        </div>
+    </div>
+
+    <!-- Movement metrics -->
+    <div id="movement-metrics">
+        <div class="metric">
+            <span>Motion</span>
+            <div class="metric-bar"><div class="metric-fill" id="metric-velocity"></div></div>
+        </div>
+        <div class="metric">
+            <span>Range</span>
+            <div class="metric-bar"><div class="metric-fill" id="metric-range"></div></div>
+        </div>
+        <div class="metric">
+            <span>Energy</span>
+            <div class="metric-bar"><div class="metric-fill" id="metric-jitter"></div></div>
+        </div>
+    </div>
+
+    <!-- Control buttons -->
+    <div id="control-buttons">
+        <button id="pause-play-btn" class="control-button"><span>Freeze</span></button>
+        <button id="toggle-skeleton-btn" class="control-button"><span>Skeleton</span></button>
+        <button id="reset-camera-btn" class="control-button"><span>Reset</span></button>
+    </div>
+
+    <!-- TensorFlow.js + MoveNet pose detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
+
+    <!-- Three.js import map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- Main application -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>
