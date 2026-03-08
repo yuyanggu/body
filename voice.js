@@ -50,7 +50,7 @@ export class Voice {
                     model: 'tts-1',
                     input: text,
                     voice: 'nova',
-                    speed: 0.95,
+                    speed: 0.98,
                 }),
             });
 
