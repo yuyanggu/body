@@ -9,10 +9,16 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 import { EXERCISES, ExerciseAnalyzer } from './exercises.js';
 import { AICompanion } from './ai-companion.js';
+import {
+    computeAnatomicalMotionState,
+    computeAtmosphereState,
+} from './visualization-metrics.js';
 
 // ============================================================
 // 1. CONSTANTS & CONFIGURATION
@@ -153,6 +159,43 @@ const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.8, 0.85);
 composer.addPass(bloomPass);
+const afterimagePass = new AfterimagePass(0.88);
+composer.addPass(afterimagePass);
+const vignettePass = new ShaderPass({
+    uniforms: {
+        tDiffuse: { value: null },
+        uStrength: { value: 0.18 },
+        uTime: { value: 0 },
+    },
+    vertexShader: `
+        varying vec2 vUv;
+        void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+    `,
+    fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float uStrength;
+        uniform float uTime;
+        varying vec2 vUv;
+
+        float grain(vec2 uv) {
+            return fract(sin(dot(uv + uTime * 0.017, vec2(12.9898, 78.233))) * 43758.5453);
+        }
+
+        void main() {
+            vec4 color = texture2D(tDiffuse, vUv);
+            float dist = distance(vUv, vec2(0.5));
+            float vignette = 1.0 - smoothstep(0.24, 0.92, dist);
+            float noise = (grain(vUv * 1.7) - 0.5) * 0.028;
+            color.rgb *= mix(1.0, vignette, uStrength);
+            color.rgb += noise * (0.3 + uStrength * 0.35);
+            gl_FragColor = color;
+        }
+    `,
+});
+composer.addPass(vignettePass);
 composer.addPass(new OutputPass());
 
 // ============================================================
@@ -196,6 +239,9 @@ const pulseUniformsDef = {
     uRangeOfMotion: { value: 0 },
     uGlobalVelocity: { value: 0 },
     uPresence: { value: 0 },
+    uHaloIntensity: { value: 0 },
+    uSilhouetteCohesion: { value: 0.35 },
+    uKneeEmphasis: { value: 0 },
     uPulsePositions: { value: [new THREE.Vector3(1e3,1e3,1e3), new THREE.Vector3(1e3,1e3,1e3), new THREE.Vector3(1e3,1e3,1e3)] },
     uPulseTimes: { value: [-1e3, -1e3, -1e3] },
     uPulseColors: { value: [new THREE.Color(1,1,1), new THREE.Color(1,1,1), new THREE.Color(1,1,1)] },
@@ -213,6 +259,7 @@ const nodeShader = {
         attribute float confidence;
 
         uniform float uTime, uJitter, uRangeOfMotion, uGlobalVelocity, uPresence;
+        uniform float uHaloIntensity, uSilhouetteCohesion, uKneeEmphasis;
         uniform vec3 uPulsePositions[3]; uniform float uPulseTimes[3]; uniform float uPulseSpeed;
         uniform float uBaseNodeSize;
 
@@ -231,11 +278,11 @@ const nodeShader = {
             vPulse=min(tp,1.);
             float bA=.08+uRangeOfMotion*.12, bS=.5+uGlobalVelocity*.6;
             float breathe=sin(uTime*bS+distFromRoot*.15)*bA+(1.-bA);
-            float sz=nodeSize*breathe*(1.+vPulse*.25)*(1.+uRangeOfMotion*.2+uGlobalVelocity*.15);
+            float sz=nodeSize*breathe*(1.+vPulse*.25)*(1.+uRangeOfMotion*.16+uGlobalVelocity*.1+uSilhouetteCohesion*.12);
             vGlow=.5+.5*sin(uTime*.5+distFromRoot*.2);
             vec3 mp=position;
             float nv=snoise(position*.08+uTime*(.08+uJitter*.3));
-            float na=.1+uJitter*1.8;
+            float na=.08+uJitter*1.2+uHaloIntensity*.22+uKneeEmphasis*.08;
             if(nodeType>1.5){            // fill point: moderate displacement
                 mp+=vec3(nv)*na*.6;
             } else if(nodeType>.5){       // (reserved)
@@ -248,7 +295,8 @@ const nodeShader = {
             gl_Position=projectionMatrix*mv;
         }`,
     fragmentShader: `
-        uniform float uTime; uniform vec3 uPulseColors[3]; uniform float uRangeOfMotion;
+        uniform float uTime; uniform vec3 uPulseColors[3];
+        uniform float uRangeOfMotion, uSilhouetteCohesion;
         varying vec3 vColor; varying float vNodeType, vPulse, vDist, vGlow, vConf, vPres;
         varying vec3 vPosition;
         void main(){
@@ -266,12 +314,12 @@ const nodeShader = {
                 vec3 pc=mix(vec3(1.),uPulseColors[0],.5);
                 fc=mix(base,pc,vPulse*.3); fc*=1.+vPulse*.35; gs*=1.+vPulse*.4;
             }
-            fc*=1.+uRangeOfMotion*.4;
+            fc*=1.+uRangeOfMotion*.3+uSilhouetteCohesion*.12;
             fc+=vec3(1.)*smoothstep(.4,0.,d)*.3;
             float a=gs*(.95-.3*d);
             float df=smoothstep(100.,15.,length(vPosition-cameraPosition));
             if(vNodeType>1.5){          // fill point: semi-transparent
-                fc*=.75; a*=.45;
+                fc*=.72+.12*uSilhouetteCohesion; a*=.32+.2*uSilhouetteCohesion;
             } else if(vNodeType<.5){    // primary keypoint: full
                 fc*=1.1;
             }
@@ -288,6 +336,7 @@ const connectionShader = {
         attribute float connectionStrength, pathIndex;
         attribute vec3 connectionColor;
         uniform float uTime, uJitter, uRangeOfMotion, uGlobalVelocity, uPresence;
+        uniform float uHaloIntensity, uSilhouetteCohesion;
         uniform vec3 uPulsePositions[3]; uniform float uPulseTimes[3]; uniform float uPulseSpeed;
         varying vec3 vColor; varying float vStr, vPulse, vPath, vCamDist, vPres;
         float pulse(vec3 wp,vec3 pp,float pt){
@@ -297,7 +346,7 @@ const connectionShader = {
         void main(){
             float t=position.x; vPath=t;
             vec3 mid=mix(startPoint,endPoint,.5);
-            float arc=sin(t*3.14159)*(.15+uJitter*.4);
+            float arc=sin(t*3.14159)*(.12+uJitter*.22+uHaloIntensity*.08);
             vec3 dir=endPoint-startPoint;
             float dl=length(dir); dir=dl>0.001?dir/dl:vec3(1.,0.,0.);
             vec3 up=abs(dot(dir,vec3(0.,1.,0.)))>.99?vec3(1.,0.,0.):vec3(0.,1.,0.);
@@ -305,7 +354,7 @@ const connectionShader = {
             mid+=perp*arc;
             vec3 a=mix(startPoint,mid,t), b=mix(mid,endPoint,t);
             vec3 fp=mix(a,b,t);
-            float nA=.12+uJitter*.5, nS=.15+uJitter*.4;
+            float nA=.08+uJitter*.32+uHaloIntensity*.12, nS=.15+uJitter*.28;
             fp+=perp*snoise(vec3(pathIndex*.08,t*.6,uTime*nS))*nA;
             vec3 wp=(modelMatrix*vec4(fp,1.)).xyz;
             float tp=0.; for(int i=0;i<3;i++) tp+=pulse(wp,uPulsePositions[i],uPulseTimes[i]);
@@ -315,23 +364,24 @@ const connectionShader = {
             gl_Position=projectionMatrix*modelViewMatrix*vec4(fp,1.);
         }`,
     fragmentShader: `
-        uniform float uTime; uniform vec3 uPulseColors[3]; uniform float uRangeOfMotion, uGlobalVelocity;
+        uniform float uTime; uniform vec3 uPulseColors[3];
+        uniform float uRangeOfMotion, uGlobalVelocity, uHaloIntensity, uSilhouetteCohesion;
         varying vec3 vColor; varying float vStr, vPulse, vPath, vCamDist, vPres;
         void main(){
             float fs1=4.+uGlobalVelocity*8., fs2=2.5+uGlobalVelocity*5.;
             float f1=sin(vPath*25.-uTime*fs1)*.5+.5;
             float f2=sin(vPath*15.-uTime*fs2+1.57)*.5+.5;
             float cmb=(f1+f2*.5)/1.5;
-            vec3 base=vColor*(.8+.2*sin(uTime*.6+vPath*12.))*(1.+uRangeOfMotion*.5);
+            vec3 base=vColor*(.6+.16*sin(uTime*.6+vPath*12.))*(.8+uRangeOfMotion*.22+uHaloIntensity*.12);
             float fi=.4*cmb*vStr; vec3 fc=base;
             if(vPulse>0.){
                 fc=mix(base,mix(vec3(1.),uPulseColors[0],.4)*1.1,vPulse*.3);
                 fi+=vPulse*.3;
             }
-            fc*=.7+fi+vStr*.5;
+            fc*=.58+fi+vStr*.28;
             float a=.7*vStr+cmb*.3;
             a=mix(a,min(1.,a*1.5),vPulse);
-            a*=smoothstep(100.,15.,vCamDist)*vPres;
+            a*=smoothstep(100.,15.,vCamDist)*vPres*(.18+uHaloIntensity*.2+(1.-uSilhouetteCohesion)*.1);
             gl_FragColor=vec4(fc,a);
         }`
 };
@@ -339,19 +389,20 @@ const connectionShader = {
 // --- Anadol flowing-particle shader ---
 const anadolShader = {
     vertexShader: `${noiseFn}
-        attribute float life, aSize;
+        attribute float life, aSize, aPopulation;
         attribute vec3 aColor;
         uniform float uTime, uPresence, uRangeOfMotion, uGlobalVelocity, uJitter;
+        uniform float uHaloIntensity, uSilhouetteCohesion, uKneeEmphasis;
         uniform vec3 uPulsePositions[3]; uniform float uPulseTimes[3]; uniform float uPulseSpeed;
         uniform float uBaseNodeSize;
-        varying float vLife, vPres, vPulse;
+        varying float vLife, vPres, vPulse, vPopulation;
         varying vec3 vColor, vPosition;
         float pulse(vec3 wp,vec3 pp,float pt){
             if(pt<0.)return 0.; float ts=uTime-pt; if(ts<0.||ts>4.)return 0.;
             return smoothstep(6.,0.,abs(distance(wp,pp)-ts*uPulseSpeed))*smoothstep(4.,0.,ts);
         }
         void main(){
-            vLife=life; vPres=uPresence; vColor=aColor;
+            vLife=life; vPres=uPresence; vColor=aColor; vPopulation=aPopulation;
             vec3 wp=(modelMatrix*vec4(position,1.)).xyz; vPosition=wp;
             float tp=0.; for(int i=0;i<3;i++) tp+=pulse(wp,uPulsePositions[i],uPulseTimes[i]);
             vPulse=min(tp,1.);
@@ -361,9 +412,15 @@ const anadolShader = {
             lifeCurve = pow(lifeCurve, 0.6); // broader peak
 
             // Noise-based size shimmer (subtle)
-            float shimmer = 1.0 + snoise(position * 0.3 + uTime * 0.3) * 0.12;
+            float shimmer = 1.0 + snoise(position * 0.3 + uTime * 0.3) * mix(0.08, 0.16, aPopulation);
+            float layerBoost = mix(
+                1.0 + uSilhouetteCohesion * 0.24,
+                1.18 + uHaloIntensity * 0.72 + uKneeEmphasis * 0.14,
+                aPopulation
+            );
 
             float sz = aSize * lifeCurve * shimmer
+                     * layerBoost
                      * (1.0 + uRangeOfMotion * 0.3 + uGlobalVelocity * 0.15)
                      * (1.0 + vPulse * 0.5);
 
@@ -372,22 +429,25 @@ const anadolShader = {
             gl_Position = projectionMatrix * mv;
         }`,
     fragmentShader: `
-        uniform float uTime, uRangeOfMotion;
+        uniform float uTime, uRangeOfMotion, uHaloIntensity, uSilhouetteCohesion, uKneeEmphasis;
         uniform vec3 uPulseColors[3];
-        varying float vLife, vPres, vPulse;
+        varying float vLife, vPres, vPulse, vPopulation;
         varying vec3 vColor, vPosition;
         void main(){
             vec2 uv = gl_PointCoord * 2.0 - 1.0;
             float d2 = dot(uv, uv);
 
-            // Tighter gaussian falloff — solid cloud look
-            float alpha = exp(-d2 * 3.5);
+            float alpha = exp(-d2 * mix(4.8, 2.4, vPopulation));
 
-            // Subtle bright core
-            float core = exp(-d2 * 12.0);
+            float core = exp(-d2 * mix(16.0, 8.0, vPopulation));
 
             vec3 fc = vColor * (1.0 + core * 0.35);
-            fc *= 1.0 + uRangeOfMotion * 0.15;
+            fc *= mix(
+                0.95 + uSilhouetteCohesion * 0.18,
+                1.0 + uHaloIntensity * 0.38 + uKneeEmphasis * 0.1,
+                vPopulation
+            );
+            fc *= 1.0 + uRangeOfMotion * 0.12;
 
             // Depth-based color temperature shift
             float zDepth = clamp(vPosition.z * 0.2, -1.0, 1.0);
@@ -404,7 +464,11 @@ const anadolShader = {
             // Life fade — higher base alpha for denser/more solid feel
             float lifeFade = sin(vLife * 3.14159);
             lifeFade = pow(lifeFade, 0.5);
-            alpha *= lifeFade * 0.32 * vPres;
+            alpha *= lifeFade * mix(
+                0.26 + uSilhouetteCohesion * 0.12,
+                0.18 + uHaloIntensity * 0.16 + uKneeEmphasis * 0.04,
+                vPopulation
+            ) * vPres;
 
             float df = smoothstep(100.0, 15.0, length(vPosition - cameraPosition));
             gl_FragColor = vec4(fc, alpha * df);
@@ -451,6 +515,14 @@ scene.add(starField);
 const bodyState = {
     isTracking: false, presence: 0,
     globalJitter: 0, globalRangeOfMotion: 0, globalVelocity: 0,
+    visual: {
+        hasTorso: false,
+        silhouetteCohesion: 0.35,
+        haloIntensity: 0,
+        kneeEmphasis: 0,
+        limbActivity: 0,
+        torsoStability: 0.35,
+    },
     keypoints: Array.from({ length: 17 }, () => ({
         raw: { x: .5, y: .5 }, smoothed: { x: .5, y: .5 },
         position3D: new THREE.Vector3(), confidence: 0,
@@ -608,12 +680,14 @@ function initParticle() {
         maxLife: 5 + Math.random() * 8,
         age: 999,
         size,
+        population: 0,     // 0 = core volume, 1 = halo / atmosphere
         segType: 2,        // 0=head, 1=torso, 2=bone, 3=wisp
         segIdx: 0,
         boneIdx: 0, t: 0, angle: 0, radiusFrac: 0,
         u: 0, v: 0, depth: 0,
         offX: 0, offY: 0, offZ: 0,
         parentKP: 0,
+        shell: 0,
         tightness: 0.04,
         level: 1,
     };
@@ -621,11 +695,29 @@ function initParticle() {
 
 const anadolParticles = Array.from({ length: ANADOL_COUNT }, initParticle);
 
+function applyParticleColor(attr, index, particle, palette) {
+    const color = palette[particle.level % palette.length].clone();
+    if (particle.population > 0.5 || particle.segType === 3) {
+        color.lerp(new THREE.Color(1, 1, 1), 0.12 + particle.shell * 0.08);
+    }
+    color.offsetHSL(
+        THREE.MathUtils.randFloatSpread(0.06 + particle.population * 0.04),
+        THREE.MathUtils.randFloatSpread(0.1),
+        THREE.MathUtils.randFloatSpread(0.1 + particle.population * 0.05)
+    );
+    attr.setXYZ(index, color.r, color.g, color.b);
+}
+
 // Assign each particle to a body-volume region and position it
 function spawnParticle(p) {
+    p.population = 0;
+    p.shell = 0;
+
     // 8% wisps — loosely tethered flowing particles from extremities
     if (Math.random() < 0.08) {
         p.segType = 3; // wisp
+        p.population = 1;
+        p.shell = 1;
         const extremes = [0, 9, 10, 15, 16, 3, 4]; // head, wrists, ankles, ears
         // Bias toward high-velocity keypoints for streaming effects
         const w = extremes.map(ki => {
@@ -645,44 +737,47 @@ function spawnParticle(p) {
         const si = pickSegment();
         const seg = BODY_SEGMENTS[si];
         p.segIdx = si;
+        p.population = Math.random() < 0.22 ? 1 : 0;
+        p.shell = p.population ? (0.75 + Math.random() * 0.35) : (Math.random() * 0.35);
 
         if (seg.type === 'head') {
             p.segType = 0;
-            // Random point in ellipsoid (sqrt for uniform volume)
             const theta = Math.random() * Math.PI * 2;
             const phi = Math.acos(Math.random() * 2 - 1);
-            const r = Math.pow(Math.random(), 0.5) * seg.radius;
-            p.offX = Math.sin(phi) * Math.cos(theta) * r;
-            p.offY = Math.sin(phi) * Math.sin(theta) * r * 1.3; // taller head
-            p.offZ = Math.cos(phi) * r * 0.6; // flatter depth
-            p.tightness = 0.04 + Math.random() * 0.03;
+            const radius = p.population
+                ? seg.radius * (0.85 + Math.random() * 0.4)
+                : Math.pow(Math.random(), 0.7) * seg.radius * 0.82;
+            p.offX = Math.sin(phi) * Math.cos(theta) * radius;
+            p.offY = Math.sin(phi) * Math.sin(theta) * radius * 1.3;
+            p.offZ = Math.cos(phi) * radius * 0.65;
+            p.tightness = p.population ? (0.018 + Math.random() * 0.012) : (0.048 + Math.random() * 0.028);
             p.level = 0;
         } else if (seg.type === 'torso') {
             p.segType = 1;
             p.u = Math.random();
             p.v = Math.random();
-            // Gaussian depth (denser in center for solid torso look)
-            p.depth = gaussRandom() * 0.4 * seg.depth;
-            p.tightness = 0.035 + Math.random() * 0.025;
+            p.depth = p.population
+                ? (Math.random() < 0.5 ? -1 : 1) * seg.depth * (0.55 + p.shell * 0.45)
+                : gaussRandom() * 0.32 * seg.depth;
+            p.tightness = p.population ? (0.015 + Math.random() * 0.012) : (0.04 + Math.random() * 0.026);
             p.level = 1;
         } else {
-            // Bone type — cylindrical distribution around skeleton bone
             p.segType = 2;
             p.boneIdx = seg.bone;
             p.t = Math.random();
             p.angle = Math.random() * Math.PI * 2;
             const width = seg.w0 + (seg.w1 - seg.w0) * p.t;
-            // Gaussian radial distribution (denser near bone axis)
-            p.radiusFrac = Math.abs(gaussRandom()) * 0.55 * width;
-            p.tightness = 0.035 + Math.random() * 0.025;
-            // Interpolated level from bone endpoints
+            p.radiusFrac = p.population
+                ? width * (0.85 + p.shell * 0.35)
+                : Math.abs(gaussRandom()) * 0.42 * width;
+            p.tightness = p.population ? (0.016 + Math.random() * 0.012) : (0.038 + Math.random() * 0.024);
             const [kpA, kpB] = SKELETON_CONNECTIONS[seg.bone];
             p.level = Math.round(KEYPOINT_LEVELS[kpA] * (1 - p.t) + KEYPOINT_LEVELS[kpB] * p.t);
         }
 
-        // Size re-roll for body particles (fine grain)
-        const sr = Math.random();
-        p.size = sr < .85 ? (.04 + Math.random() * .08) : (.12 + Math.random() * .13);
+        p.size = p.population
+            ? (0.08 + Math.random() * 0.16)
+            : (Math.random() < 0.86 ? (0.045 + Math.random() * 0.08) : (0.11 + Math.random() * 0.1));
     }
 
     // Place at tether position
@@ -803,14 +898,14 @@ function createBodyVisualization() {
     const aLife = new Float32Array(ANADOL_COUNT);
     const aSize = new Float32Array(ANADOL_COUNT);
     const aCol = new Float32Array(ANADOL_COUNT * 3);
+    const aPopulation = new Float32Array(ANADOL_COUNT);
 
     for (let i = 0; i < ANADOL_COUNT; i++) {
         const p = anadolParticles[i];
         aSize[i] = p.size;
         aLife[i] = p.life;
-        const col = palette[p.level % palette.length].clone();
-        col.offsetHSL(THREE.MathUtils.randFloatSpread(.1), THREE.MathUtils.randFloatSpread(.15), THREE.MathUtils.randFloatSpread(.12));
-        aCol.set([col.r, col.g, col.b], i * 3);
+        aPopulation[i] = p.population;
+        applyParticleColor({ setXYZ: (index, r, g, b) => aCol.set([r, g, b], index * 3) }, i, p, palette);
     }
 
     const aGeo = new THREE.BufferGeometry();
@@ -818,6 +913,7 @@ function createBodyVisualization() {
     aGeo.setAttribute('life', new THREE.Float32BufferAttribute(aLife, 1));
     aGeo.setAttribute('aSize', new THREE.Float32BufferAttribute(aSize, 1));
     aGeo.setAttribute('aColor', new THREE.Float32BufferAttribute(aCol, 3));
+    aGeo.setAttribute('aPopulation', new THREE.Float32BufferAttribute(aPopulation, 1));
 
     anadolMesh = new THREE.Points(aGeo, new THREE.ShaderMaterial({
         uniforms: THREE.UniformsUtils.clone(pulseUniformsDef),
@@ -877,6 +973,7 @@ function processKeypoints(raw) {
     bodyState.isTracking = trackAny;
     if (valid > 0) bodyState.globalVelocity = THREE.MathUtils.clamp(totVel / valid * config.sensitivity * .5, 0, 1);
     computeJitter(); computeRange();
+    bodyState.visual = computeAnatomicalMotionState(bodyState.keypoints, CONFIDENCE_THRESHOLD);
 }
 
 function computeJitter() {
@@ -971,9 +1068,15 @@ function computeTether(p) {
             const rs = bodyState.keypoints[6].position3D;
             const lh = bodyState.keypoints[11].position3D;
             const rh = bodyState.keypoints[12].position3D;
-            _v3c.lerpVectors(ls, rs, p.u);
-            _v3d.lerpVectors(lh, rh, p.u);
-            _tetherOut.lerpVectors(_v3c, _v3d, p.v);
+            const u = p.population > 0.5
+                ? THREE.MathUtils.clamp(0.5 + (p.u - 0.5) * (1.18 + p.shell * 0.35), 0, 1)
+                : p.u;
+            const v = p.population > 0.5
+                ? THREE.MathUtils.clamp(0.5 + (p.v - 0.5) * (1.18 + p.shell * 0.3), 0, 1)
+                : p.v;
+            _v3c.lerpVectors(ls, rs, u);
+            _v3d.lerpVectors(lh, rh, u);
+            _tetherOut.lerpVectors(_v3c, _v3d, v);
             _tetherOut.addScaledVector(torsoNormal, p.depth);
             return _tetherOut;
         }
@@ -1109,14 +1212,16 @@ function updateAnadolParticles(time, dt) {
     const lifeAttr = anadolMesh.geometry.attributes.life;
     const sizeAttr = anadolMesh.geometry.attributes.aSize;
     const colAttr = anadolMesh.geometry.attributes.aColor;
+    const popAttr = anadolMesh.geometry.attributes.aPopulation;
 
     // Precompute body-volume infrastructure
     updateBonePerps();
     updateTorsoNormal();
 
     const turb = bodyState.globalJitter;
+    const motionState = bodyState.visual;
     const baseSpeed = .35 + bodyState.globalVelocity * 1.2;
-    let colorDirty = false, sizeDirty = false;
+    let colorDirty = false, sizeDirty = false, populationDirty = false;
 
     for (let i = 0; i < ANADOL_COUNT; i++) {
         const p = anadolParticles[i];
@@ -1131,35 +1236,39 @@ function updateAnadolParticles(time, dt) {
         const dx = p.x - tx, dy = p.y - ty, dz = p.z - tz;
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-        // Max drift: tight for body particles, loose for wisps
-        const maxDrift = p.segType === 3 ? (10 + bodyState.globalRangeOfMotion * 6) : 4;
+        const isHalo = p.population > 0.5 || p.segType === 3;
+        const isLegParticle = p.parentKP === 13 || p.parentKP === 14 || (p.segType === 2 && p.boneIdx >= 12);
+        const localFocus = isLegParticle ? motionState.kneeEmphasis : motionState.haloIntensity * 0.35;
+        const maxDrift = p.segType === 3
+            ? (9 + bodyState.globalRangeOfMotion * 6 + motionState.haloIntensity * 4)
+            : isHalo
+                ? (4.8 + motionState.haloIntensity * 3.4 + localFocus * 1.8)
+                : (2.8 + (1 - motionState.silhouetteCohesion) * 1.4 + localFocus * 0.8);
 
         if (p.life <= 0 || dist > maxDrift) {
             spawnParticle(p);
             posAttr.setXYZ(i, p.x, p.y, p.z);
             lifeAttr.setX(i, p.life);
             sizeAttr.setX(i, p.size); sizeDirty = true;
-            // Update color on respawn
             const pal = colorPalettes[config.activePaletteIndex];
-            const c = pal[p.level % pal.length].clone();
-            c.offsetHSL(
-                THREE.MathUtils.randFloatSpread(.1),
-                THREE.MathUtils.randFloatSpread(.15),
-                THREE.MathUtils.randFloatSpread(.12)
-            );
-            colAttr.setXYZ(i, c.r, c.g, c.b);
+            applyParticleColor(colAttr, i, p, pal);
             colorDirty = true;
+            popAttr.setX(i, p.population);
+            populationDirty = true;
             continue;
         }
 
-        // Flow field (gentle for body particles, stronger for wisps)
         const flow = flowField(p.x + i * 0.007, p.y, p.z, time, turb);
         const speed = p.segType === 3
-            ? baseSpeed * (1.2 + p.size * 2)     // wisps flow freely
-            : baseSpeed * (.25 + p.size * .8);    // body particles: gentle shimmer
-
-        // Spring toward tether position
-        const spring = p.tightness * (1 + dist * 0.12);
+            ? baseSpeed * (1.15 + p.size * 2.2 + motionState.haloIntensity * 1.15 + localFocus * 0.35)
+            : isHalo
+                ? baseSpeed * (0.34 + p.size * 1.15 + motionState.haloIntensity * 0.95 + localFocus * 0.4)
+                : baseSpeed * (0.16 + p.size * 0.55 + (1 - motionState.silhouetteCohesion) * 0.2 + localFocus * 0.18);
+        const spring = p.segType === 3
+            ? p.tightness * (0.65 + dist * 0.06)
+            : isHalo
+                ? p.tightness * (0.84 + dist * 0.08 + motionState.haloIntensity * 0.2)
+                : p.tightness * (1.3 + motionState.silhouetteCohesion * 1.1 + dist * 0.12 + localFocus * 0.12);
 
         // Update position
         p.x += (flow.x * speed - dx * spring) * dt * 60;
@@ -1173,6 +1282,7 @@ function updateAnadolParticles(time, dt) {
     lifeAttr.needsUpdate = true;
     if (colorDirty) colAttr.needsUpdate = true;
     if (sizeDirty) sizeAttr.needsUpdate = true;
+    if (populationDirty) popAttr.needsUpdate = true;
 }
 
 function updateUniforms(time) {
@@ -1182,12 +1292,27 @@ function updateUniforms(time) {
         uRangeOfMotion: bodyState.globalRangeOfMotion,
         uGlobalVelocity: bodyState.globalVelocity,
         uPresence: bodyState.presence,
+        uHaloIntensity: bodyState.visual.haloIntensity,
+        uSilhouetteCohesion: bodyState.visual.silhouetteCohesion,
+        uKneeEmphasis: bodyState.visual.kneeEmphasis,
     };
     allMeshes().forEach(m => {
         const u = m.material.uniforms;
         for (const [k, v] of Object.entries(vals)) u[k].value = v;
     });
-    bloomPass.strength = 0.6 + bodyState.globalRangeOfMotion * 0.5;
+    const atmosphere = computeAtmosphereState(bodyState.visual, {
+        velocity: bodyState.globalVelocity,
+        jitter: bodyState.globalJitter,
+        rangeOfMotion: bodyState.globalRangeOfMotion,
+        presence: bodyState.presence,
+    });
+    bloomPass.strength = atmosphere.bloomStrength;
+    bloomPass.radius = 0.75 + bodyState.visual.haloIntensity * 0.35;
+    bloomPass.threshold = 0.18 + bodyState.visual.silhouetteCohesion * 0.05;
+    afterimagePass.uniforms.damp.value = atmosphere.afterimageDamp;
+    vignettePass.uniforms.uStrength.value = atmosphere.vignetteStrength;
+    vignettePass.uniforms.uTime.value = time;
+    scene.fog.density = atmosphere.fogDensity;
 }
 
 // ============================================================
@@ -1327,10 +1452,7 @@ function updateTheme(pi) {
     if (anadolMesh) {
         const ca = anadolMesh.geometry.attributes.aColor;
         for (let i = 0; i < ANADOL_COUNT; i++) {
-            const p = anadolParticles[i];
-            const c = pal[p.level % pal.length].clone();
-            c.offsetHSL(THREE.MathUtils.randFloatSpread(.1), THREE.MathUtils.randFloatSpread(.15), THREE.MathUtils.randFloatSpread(.12));
-            ca.setXYZ(i, c.r, c.g, c.b);
+            applyParticleColor(ca, i, anadolParticles[i], pal);
         }
         ca.needsUpdate = true;
     }
@@ -1505,6 +1627,7 @@ function setupUI() {
         renderer.setSize(window.innerWidth, window.innerHeight);
         composer.setSize(window.innerWidth, window.innerHeight);
         bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+        if (afterimagePass.setSize) afterimagePass.setSize(window.innerWidth, window.innerHeight);
     });
 }
 
