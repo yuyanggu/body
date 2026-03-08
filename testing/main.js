@@ -1,6 +1,6 @@
 // ============================================================
-// Residual Motion — main.js
-// Orchestrator: scene setup, starfield, animation loop, init
+// Testing Mode — shader + MoveNet + camera only, no exercises
+// Accessible at /testing
 // ============================================================
 
 import * as THREE from 'three';
@@ -10,24 +10,14 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-import { ExerciseAnalyzer } from './exercises.js';
-import { AICompanion } from './ai-companion.js';
-import { config } from './config.js';
-import { ParticleSystem } from './particle-system.js';
-import { KeypointSampler, createKeypointOverlay, updateKeypointOverlay } from './keypoint-sampler.js';
-import { bodyState, processKeypoints, detectPose, setupCamera, setupPoseDetection } from './pose-detection.js';
-import { generateTestKeypoints } from './test-mode.js';
-import { setupUI, updateExerciseHUD, updateStatusUI } from './ui.js';
+import { config, PARTICLE_SIZE } from '../config.js';
+import { ParticleSystem } from '../particle-system.js';
+import { KeypointSampler, createKeypointOverlay, updateKeypointOverlay } from '../keypoint-sampler.js';
+import { bodyState, processKeypoints, detectPose, setupCamera, setupPoseDetection, hasDetector } from '../pose-detection.js';
+import { generateTestKeypoints } from '../test-mode.js';
 
 // ============================================================
-// Instances
-// ============================================================
-
-const exerciseAnalyzer = new ExerciseAnalyzer();
-const aiCompanion = new AICompanion();
-
-// ============================================================
-// Three.js Scene Setup
+// Scene Setup
 // ============================================================
 
 const scene = new THREE.Scene();
@@ -48,7 +38,6 @@ controls.dampingFactor = 0.05;
 controls.rotateSpeed = 0.6;
 controls.minDistance = 50;
 controls.maxDistance = 600;
-controls.autoRotate = false;
 controls.enablePan = false;
 
 const composer = new EffectComposer(renderer);
@@ -57,7 +46,6 @@ const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, windo
 composer.addPass(bloomPass);
 composer.addPass(new OutputPass());
 
-// Light for shadow pass
 const lightPosition = new THREE.Vector3(0, -200, 3000);
 
 // ============================================================
@@ -97,6 +85,101 @@ scene.add(starField);
 const keypointOverlay = createKeypointOverlay(scene);
 
 // ============================================================
+// UI Setup (minimal — no exercises)
+// ============================================================
+
+function setupTestingUI() {
+    // Test mode toggle
+    const testToggle = document.getElementById('test-mode-toggle');
+    testToggle.checked = config.testMode;
+    testToggle.addEventListener('change', e => {
+        e.stopPropagation();
+        config.testMode = testToggle.checked;
+        if (config.testMode) {
+            bodyState.isTracking = true;
+            bodyState.presence = 1.0;
+        } else {
+            bodyState.isTracking = false;
+            bodyState.presence = 0;
+            if (!hasDetector()) {
+                setupCamera().then(() => setupPoseDetection()).catch(err => {
+                    console.warn('Camera setup failed:', err);
+                });
+            }
+        }
+    });
+
+    // Keypoints overlay toggle
+    const kpToggle = document.getElementById('keypoints-toggle');
+    kpToggle.addEventListener('change', e => {
+        e.stopPropagation();
+        config.showKeypoints = kpToggle.checked;
+    });
+
+    // Pause/play
+    document.getElementById('pause-play-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        config.paused = !config.paused;
+        e.currentTarget.querySelector('span').textContent = config.paused ? 'Play' : 'Freeze';
+    });
+
+    // Reset camera
+    document.getElementById('reset-camera-btn').addEventListener('click', e => {
+        e.stopPropagation();
+        controls.reset();
+    });
+
+    // Resize
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+        bloomPass.resolution.set(window.innerWidth, window.innerHeight);
+    });
+}
+
+// ============================================================
+// Status UI
+// ============================================================
+
+const statusDot = document.querySelector('.status-dot');
+const trackingText = document.getElementById('tracking-text');
+const statusCamera = document.getElementById('status-camera');
+const statusTracking = document.getElementById('status-tracking');
+const statusParticles = document.getElementById('status-particles');
+const statusFps = document.getElementById('status-fps');
+
+let frameCount = 0;
+let lastFpsTime = 0;
+let currentFps = 0;
+
+function updateStatusUI(t) {
+    // Tracking dot
+    if (bodyState.isTracking) { statusDot.classList.add('tracking'); trackingText.textContent = 'Tracking'; }
+    else { statusDot.classList.remove('tracking'); trackingText.textContent = hasDetector() || config.testMode ? 'No body' : 'Loading...'; }
+
+    // Metric bars
+    document.getElementById('metric-velocity').style.width = `${bodyState.globalVelocity * 100}%`;
+    document.getElementById('metric-range').style.width = `${bodyState.globalRangeOfMotion * 100}%`;
+    document.getElementById('metric-jitter').style.width = `${bodyState.globalJitter * 100}%`;
+
+    // FPS counter
+    frameCount++;
+    if (t - lastFpsTime >= 1.0) {
+        currentFps = Math.round(frameCount / (t - lastFpsTime));
+        frameCount = 0;
+        lastFpsTime = t;
+    }
+
+    // Status panel
+    statusCamera.textContent = config.testMode ? 'Synthetic' : (hasDetector() ? 'Active' : 'Loading...');
+    statusTracking.textContent = bodyState.isTracking ? 'Yes' : 'No';
+    statusParticles.textContent = `${PARTICLE_SIZE}x${PARTICLE_SIZE} (${(PARTICLE_SIZE * PARTICLE_SIZE).toLocaleString()})`;
+    statusFps.textContent = currentFps || '—';
+}
+
+// ============================================================
 // Animation Loop
 // ============================================================
 
@@ -127,27 +210,9 @@ function animate() {
     if (!bodyState.isTracking && bodyState.presence > 0) bodyState.presence = Math.max(0, bodyState.presence - .008);
 
     if (!config.paused && particleSystem && keypointSampler) {
-        // Update keypoint sampler with current body data
         keypointSampler.update(bodyState);
-
-        // Update GPU particle system
         const activity = Math.min(1.0, bodyState.globalVelocity + bodyState.globalJitter * 0.5);
         particleSystem.update(dt, t, keypointSampler, camera, lightPosition, activity);
-
-        // Exercise analysis (during exercise mode)
-        if (config.appMode === 'exercise' && bodyState.isTracking) {
-            const exState = exerciseAnalyzer.update(bodyState);
-            if (exState) {
-                updateExerciseHUD(exState, aiCompanion);
-
-                // AI companion update
-                aiCompanion.update(exState, {
-                    velocity: bodyState.globalVelocity,
-                    jitter: bodyState.globalJitter,
-                    rangeOfMotion: bodyState.globalRangeOfMotion,
-                });
-            }
-        }
     }
 
     starField.rotation.y += .0002;
@@ -155,7 +220,7 @@ function animate() {
     controls.update();
     composer.render();
 
-    if (Math.floor(t * 10) % 2 === 0) updateStatusUI();
+    if (Math.floor(t * 10) % 2 === 0) updateStatusUI(t);
 }
 
 // ============================================================
@@ -166,7 +231,7 @@ async function init() {
     const overlay = document.getElementById('loading-overlay');
     const sub = overlay.querySelector('.loading-subtitle');
 
-    setupUI({ exerciseAnalyzer, aiCompanion, controls, camera, renderer, composer, bloomPass });
+    setupTestingUI();
 
     // Create GPU particle system
     particleSystem = new ParticleSystem(renderer);
@@ -176,14 +241,10 @@ async function init() {
     keypointSampler = new KeypointSampler();
 
     if (config.testMode) {
-        // Test mode: skip camera/pose setup
         sub.textContent = 'Test mode — synthetic body';
         bodyState.isTracking = true;
         bodyState.presence = 1.0;
-        setTimeout(() => {
-            overlay.classList.add('hidden');
-            document.getElementById('exercise-overlay').classList.remove('hidden');
-        }, 600);
+        setTimeout(() => overlay.classList.add('hidden'), 600);
     } else {
         try {
             sub.textContent = 'Starting camera...';
@@ -191,10 +252,7 @@ async function init() {
             sub.textContent = 'Loading MoveNet model...';
             await setupPoseDetection();
             sub.textContent = 'Ready!';
-            setTimeout(() => {
-                overlay.classList.add('hidden');
-                document.getElementById('exercise-overlay').classList.remove('hidden');
-            }, 600);
+            setTimeout(() => overlay.classList.add('hidden'), 600);
         } catch (err) {
             console.error('Init error:', err);
             sub.textContent = `Error: ${err.message || 'Could not start camera or load model.'}`;
