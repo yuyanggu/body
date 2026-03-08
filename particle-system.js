@@ -20,7 +20,7 @@ class OpacityPass {
         this.renderer = renderer;
 
         this.lightCamera = new THREE.OrthographicCamera(
-            -ORTHO_SIZE, ORTHO_SIZE, ORTHO_SIZE, -ORTHO_SIZE, 1, 30000
+            -ORTHO_SIZE, ORTHO_SIZE, ORTHO_SIZE, -ORTHO_SIZE, 1, 3000
         );
         this.lightCamera.position.set(0, -100, 800);
         this.lightCamera.updateMatrixWorld();
