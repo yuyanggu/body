@@ -106,6 +106,7 @@ export class KeypointSampler {
         this.velocityTexture.needsUpdate = true;
 
         this.prevPositions = new Float32Array(total * 3);
+        this.smoothedVelocity = new Float32Array(total * 3);
     }
 
     _lerp2(kpA, kpB, t) {
@@ -267,7 +268,8 @@ export class KeypointSampler {
             points.push({ x: src.x, y: src.y, z: src.z });
         }
 
-        // Write to textures
+        // Write to textures with smoothed velocity
+        const smoothing = 0.12; // EMA factor — lower = smoother (0.12 ≈ ~8 frame rise/fall)
         for (let i = 0; i < totalSlots; i++) {
             const p = points[i];
             const i4 = i * 4;
@@ -278,9 +280,19 @@ export class KeypointSampler {
             posData[i4 + 2] = p.z;
             posData[i4 + 3] = 1.0;
 
-            velData[i4] = p.x - this.prevPositions[i3];
-            velData[i4 + 1] = p.y - this.prevPositions[i3 + 1];
-            velData[i4 + 2] = p.z - this.prevPositions[i3 + 2];
+            // Raw frame delta
+            const rawVx = p.x - this.prevPositions[i3];
+            const rawVy = p.y - this.prevPositions[i3 + 1];
+            const rawVz = p.z - this.prevPositions[i3 + 2];
+
+            // Exponential moving average on velocity
+            this.smoothedVelocity[i3] += (rawVx - this.smoothedVelocity[i3]) * smoothing;
+            this.smoothedVelocity[i3 + 1] += (rawVy - this.smoothedVelocity[i3 + 1]) * smoothing;
+            this.smoothedVelocity[i3 + 2] += (rawVz - this.smoothedVelocity[i3 + 2]) * smoothing;
+
+            velData[i4] = this.smoothedVelocity[i3];
+            velData[i4 + 1] = this.smoothedVelocity[i3 + 1];
+            velData[i4 + 2] = this.smoothedVelocity[i3 + 2];
             velData[i4 + 3] = 0.0;
 
             this.prevPositions[i3] = p.x;

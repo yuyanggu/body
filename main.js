@@ -18,6 +18,7 @@ import { KeypointSampler, createKeypointOverlay, updateKeypointOverlay } from '.
 import { bodyState, processKeypoints, detectPose, setupCamera, setupPoseDetection } from './pose-detection.js';
 import { generateTestKeypoints } from './test-mode.js';
 import { setupUI, updateExerciseHUD, updateStatusUI } from './ui.js';
+import { createDataOverlay, updateDataOverlay } from './data-overlay.js';
 
 // ============================================================
 // Instances
@@ -95,6 +96,7 @@ scene.add(starField);
 
 // Keypoint overlay
 const keypointOverlay = createKeypointOverlay(scene);
+const dataOverlayCanvas = createDataOverlay();
 
 // ============================================================
 // Animation Loop
@@ -148,6 +150,14 @@ function animate() {
                 });
             }
         }
+    }
+
+    // Data overlay
+    if (config.showDataOverlay) {
+        updateDataOverlay(dataOverlayCanvas, bodyState, camera, t);
+    } else {
+        const dCtx = dataOverlayCanvas.getContext('2d');
+        dCtx.clearRect(0, 0, dataOverlayCanvas.width, dataOverlayCanvas.height);
     }
 
     starField.rotation.y += .0002;

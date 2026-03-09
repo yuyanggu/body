@@ -153,9 +153,9 @@ void main() {
     vec3 followPosition = mix(vec3(0.0, -(1.0 - initAnimation) * 200.0, 0.0), meshPos.xyz, smoothstep(0.2, 0.7, initAnimation));
 
     // Modulate behaviour by body activity (0 = still, 1 = moving)
-    float activityCurl = 0.15 + bodyActivity * 0.85;
+    float activityCurl = 0.2 + bodyActivity * 0.8;
     float activityWind = 0.1 + bodyActivity * 0.9;
-    float activityAttract = 1.0 + (1.0 - bodyActivity) * 0.5; // gentle tightening when still
+    float activityAttract = 1.0 + (1.0 - bodyActivity) * 0.5;
 
     if (life < 0.0) {
         positionInfo = texture2D(textureDefaultPosition, uv);
@@ -167,8 +167,14 @@ void main() {
         position += toTarget * (0.005 + life * 0.015) * attraction * activityAttract * (1.0 - smoothstep(50.0, 350.0, length(toTarget))) * speed * dt;
 
         float drift = 1.0 - life;
-        vec3 curlNoise = curl(position * curlSize, time, 0.1);
-        position += (wind * activityWind + curlNoise * speed * activityCurl) * drift * dt;
+        vec3 curlNoise = curl(position * curlSize, time * 1.3, 0.18);
+        position += (wind * activityWind + curlNoise * speed * 1.2 * activityCurl) * drift * dt;
+
+        // Lattice alignment — particles snap to grid when body is still (TD instancing)
+        float gridSpacing = 1.3;
+        vec3 nearestGrid = round(position / gridSpacing) * gridSpacing;
+        float gridPull = (1.0 - smoothstep(0.0, 0.35, bodyActivity)) * 0.04;
+        position += (nearestGrid - position) * gridPull * dt;
     }
 
     gl_FragColor = vec4(position, life);
@@ -181,18 +187,22 @@ precision highp float;
 #include <common>
 uniform sampler2D texturePosition;
 uniform sampler2D textureSortKey;
+uniform sampler2D textureMeshVelocities;
 uniform float useSortKey;
 uniform float pointSize;
 uniform vec2 sortResolution;
+uniform float meshSampleSize;
 uniform mat4 lightViewMatrix;
 uniform mat4 lightProjectionMatrix;
 
 varying float vLife;
+varying float vVelocity;
 varying float vColorIndex;
 varying vec4 vLightSpacePos;
 
 void main() {
-    vec2 posUV = position.xy;
+    vec2 origUV = position.xy;
+    vec2 posUV = origUV;
 
     if (useSortKey > 0.5) {
         vec4 sortData = texture2D(textureSortKey, position.xy);
@@ -206,6 +216,13 @@ void main() {
     vec4 positionInfo = texture2D(texturePosition, posUV);
     vec4 worldPosition = modelMatrix * vec4(positionInfo.xyz, 1.0);
     vec4 mvPosition = viewMatrix * worldPosition;
+
+    // Recompute keypoint hash to sample velocity (same hash as position shader)
+    float hashVal = fract(sin(dot(posUV, vec2(12.9898, 78.233))) * 43758.5453);
+    vec2 meshUV = vec2(fract(hashVal * 127.1), fract(hashVal * 311.7));
+    meshUV = (floor(meshUV * meshSampleSize) + 0.5) / meshSampleSize;
+    vec4 meshVel = texture2D(textureMeshVelocities, meshUV);
+    vVelocity = length(meshVel.xyz);
 
     vLife = positionInfo.w;
     vColorIndex = fract(posUV.x * 431.0 + posUV.y * 7697.0);
@@ -224,12 +241,43 @@ precision highp float;
 #include <common>
 
 varying float vLife;
+varying float vVelocity;
 varying float vColorIndex;
 varying vec4 vLightSpacePos;
 
 uniform vec3 lightDirection;
 uniform sampler2D opacityTexture;
 uniform float shadowDensity;
+
+// Velocity-driven color ramp (CHOP-to-color mapping)
+vec3 velocityRamp(float vel, float variation) {
+    // 5-stop ramp: teal → blue → purple → magenta → hot pink
+    vec3 c0 = vec3(0.05, 0.55, 0.7);   // still — cool teal
+    vec3 c1 = vec3(0.15, 0.25, 1.2);   // slow — deep blue
+    vec3 c2 = vec3(0.55, 0.1, 1.2);    // medium — purple
+    vec3 c3 = vec3(1.2, 0.12, 0.55);   // fast — magenta
+    vec3 c4 = vec3(1.4, 0.4, 0.3);     // burst — hot amber
+
+    float t = clamp(vel, 0.0, 1.0);
+    // Per-particle variation shifts position on ramp
+    t = clamp(t + (variation - 0.5) * 0.15, 0.0, 1.0);
+
+    vec3 color;
+    if (t < 0.25) {
+        color = mix(c0, c1, t * 4.0);
+    } else if (t < 0.5) {
+        color = mix(c1, c2, (t - 0.25) * 4.0);
+    } else if (t < 0.75) {
+        color = mix(c2, c3, (t - 0.5) * 4.0);
+    } else {
+        color = mix(c3, c4, (t - 0.75) * 4.0);
+    }
+
+    // Life-stage brightness: fresh particles slightly brighter
+    color *= 0.85 + 0.15 * smoothstep(0.0, 0.5, vel);
+
+    return color;
+}
 
 void main() {
     vec2 coord = gl_PointCoord * 2.0 - 1.0;
@@ -245,14 +293,11 @@ void main() {
     vec3 halfDir = normalize(lightDir + viewDir);
     float specular = pow(max(dot(normal, halfDir), 0.0), 32.0);
 
-    vec3 palette[4];
-    palette[0] = vec3(1.3, 0.15, 0.6);
-    palette[1] = vec3(0.6, 0.15, 1.3);
-    palette[2] = vec3(0.15, 0.4, 1.4);
-    palette[3] = vec3(1.0, 0.3, 1.2);
+    // Data-driven color: velocity magnitude → color ramp
+    // Gentle curve — sqrt compresses spikes, lower multiplier avoids flashing
+    float velNorm = sqrt(clamp(vVelocity * 1.2, 0.0, 1.0));
+    vec3 baseColor = velocityRamp(velNorm, vColorIndex);
 
-    int idx = int(floor(vColorIndex * 5.0));
-    vec3 baseColor = palette[idx];
     vec3 litColor = baseColor * (0.7 + 0.3 * diffuse) + vec3(0.3) * specular;
 
     vec2 lightUV = vLightSpacePos.xy / vLightSpacePos.w * 0.5 + 0.5;

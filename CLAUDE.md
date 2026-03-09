@@ -1,6 +1,6 @@
 # Prompted by the Body: Residual Motion
 
-*Part of the "Prompted by the Body" MA research series.*
+*Part of the "Prompted by the Body" research series.*
 
 A physio exercise web app that uses the body as an interface for ACL recovery. Camera-based pose detection and biomechanical sensing drive a particle visualization, while an AI companion offers quiet, spoken reflections. The project explores how continuous embodied data — rather than typed text — can ground and enrich AI interaction.
 

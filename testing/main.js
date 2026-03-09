@@ -15,6 +15,7 @@ import { ParticleSystem } from '../particle-system.js';
 import { KeypointSampler, createKeypointOverlay, updateKeypointOverlay } from '../keypoint-sampler.js';
 import { bodyState, processKeypoints, detectPose, setupCamera, setupPoseDetection, hasDetector } from '../pose-detection.js';
 import { generateTestKeypoints } from '../test-mode.js';
+import { createDataOverlay, updateDataOverlay } from '../data-overlay.js';
 
 // ============================================================
 // Scene Setup
@@ -83,6 +84,7 @@ scene.add(starField);
 
 // Keypoint overlay
 const keypointOverlay = createKeypointOverlay(scene);
+const dataOverlayCanvas = createDataOverlay();
 
 // ============================================================
 // UI Setup (minimal — no exercises)
@@ -114,6 +116,13 @@ function setupTestingUI() {
     kpToggle.addEventListener('change', e => {
         e.stopPropagation();
         config.showKeypoints = kpToggle.checked;
+    });
+
+    // Data overlay toggle
+    const dataToggle = document.getElementById('data-overlay-toggle');
+    dataToggle.addEventListener('change', e => {
+        e.stopPropagation();
+        config.showDataOverlay = dataToggle.checked;
     });
 
     // Pause/play
@@ -213,6 +222,14 @@ function animate() {
         keypointSampler.update(bodyState);
         const activity = Math.min(1.0, bodyState.globalVelocity + bodyState.globalJitter * 0.5);
         particleSystem.update(dt, t, keypointSampler, camera, lightPosition, activity);
+    }
+
+    // Data overlay
+    if (config.showDataOverlay) {
+        updateDataOverlay(dataOverlayCanvas, bodyState, camera, t);
+    } else {
+        const dCtx = dataOverlayCanvas.getContext('2d');
+        dCtx.clearRect(0, 0, dataOverlayCanvas.width, dataOverlayCanvas.height);
     }
 
     starField.rotation.y += .0002;

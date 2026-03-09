@@ -11,6 +11,7 @@ export const config = {
     appMode: 'select',
     testMode: new URLSearchParams(window.location.search).has('test'),
     showKeypoints: false,
+    showDataOverlay: false,
 };
 
 export const CONFIDENCE_THRESHOLD = 0.3;

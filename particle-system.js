@@ -294,10 +294,12 @@ export class ParticleSystem {
             uniforms: {
                 texturePosition: { value: null },
                 textureSortKey: { value: null },
+                textureMeshVelocities: { value: null },
                 opacityTexture: { value: null },
                 useSortKey: { value: 1.0 },
                 pointSize: this.pointSizeUniform,
                 sortResolution: { value: new THREE.Vector2(PARTICLE_SIZE, PARTICLE_SIZE) },
+                meshSampleSize: { value: SAMPLE_SIZE },
                 lightDirection: { value: new THREE.Vector3(0.5, 0.8, 1.0) },
                 lightViewMatrix: { value: new THREE.Matrix4() },
                 lightProjectionMatrix: { value: new THREE.Matrix4() },
@@ -347,6 +349,11 @@ export class ParticleSystem {
         this.particleMaterial.uniforms.textureSortKey.value = sortTexture;
         this.particleMaterial.uniforms.useSortKey.value = sortEnabled ? 1.0 : 0.0;
         this.particleMaterial.uniforms.opacityTexture.value = this.opacityPass.getOpacityTexture();
+
+        if (keypointSampler) {
+            this.particleMaterial.uniforms.textureMeshVelocities.value = keypointSampler.velocityTexture;
+            this.particleMaterial.uniforms.meshSampleSize.value = keypointSampler.size;
+        }
 
         const lightCamera = this.opacityPass.getLightCamera();
         this.particleMaterial.uniforms.lightViewMatrix.value.copy(lightCamera.matrixWorldInverse);

@@ -44,6 +44,15 @@ export function setupUI(deps) {
         config.showKeypoints = kpToggle.checked;
     });
 
+    // Data overlay toggle
+    const dataToggle = document.getElementById('data-overlay-toggle');
+    if (dataToggle) {
+        dataToggle.addEventListener('change', e => {
+            e.stopPropagation();
+            config.showDataOverlay = dataToggle.checked;
+        });
+    }
+
     document.getElementById('pause-play-btn').addEventListener('click', e => {
         e.stopPropagation();
         config.paused = !config.paused;
