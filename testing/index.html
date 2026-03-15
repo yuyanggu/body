@@ -3,8 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Body Neural Network</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Residual Motion — Testing</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        #testing-status {
+            position: fixed;
+            top: 24px;
+            left: 24px;
+            padding: 16px 20px;
+            font-size: 13px;
+            font-family: var(--font-pixel);
+            color: rgba(255,255,255,0.7);
+            font-weight: 300;
+            z-index: 10;
+        }
+        #testing-status .title {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        #testing-status .status-line {
+            margin-bottom: 6px;
+        }
+        #testing-status .status-line span {
+            color: white;
+            font-weight: 500;
+        }
+    </style>
 </head>
 <body>
 
@@ -16,70 +44,21 @@
 
     <!-- Loading overlay -->
     <div id="loading-overlay">
-        <div class="loading-title">Movement Dialogue</div>
-        <div class="loading-subtitle">Loading pose detection model...</div>
+        <div class="loading-title">Testing Mode</div>
+        <div class="loading-subtitle">Loading...</div>
         <div class="loading-bar"><div class="loading-progress"></div></div>
     </div>
 
-    <!-- Exercise Selection Overlay -->
-    <div id="exercise-overlay">
-        <div class="exercise-overlay-inner">
-            <div class="exercise-overlay-title">Choose Your Movement</div>
-            <div class="exercise-overlay-subtitle">Select an exercise to begin your session</div>
-            <div id="exercise-grid"></div>
-            <div class="exercise-overlay-footer">
-                <button id="sensor-connect-btn" class="control-button hidden">
-                    <span id="sensor-btn-label">Connect Sensor</span>
-                </button>
-                <button id="api-key-btn" class="control-button">
-                    <span id="api-key-btn-label">Set API Key</span>
-                </button>
-            </div>
-        </div>
+    <!-- Status panel -->
+    <div id="testing-status" class="glass-panel">
+        <div class="title">Testing</div>
+        <div class="status-line">Camera: <span id="status-camera">—</span></div>
+        <div class="status-line">Tracking: <span id="status-tracking">—</span></div>
+        <div class="status-line">Particles: <span id="status-particles">—</span></div>
+        <div class="status-line">FPS: <span id="status-fps">—</span></div>
     </div>
 
-    <!-- API Key Modal -->
-    <div id="api-key-modal" class="hidden">
-        <div class="api-key-modal-inner glass-panel">
-            <div class="api-key-modal-title">OpenAI API Key</div>
-            <div class="api-key-modal-desc">Enter your API key for voice companion feedback. Stored locally in your browser.</div>
-            <input type="password" id="api-key-input" placeholder="sk-..." autocomplete="off" />
-            <div class="api-key-modal-actions">
-                <button id="api-key-save" class="control-button"><span>Save</span></button>
-                <button id="api-key-cancel" class="control-button"><span>Cancel</span></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Instructions (shown during exercise mode) -->
-    <div id="instructions-container" class="glass-panel hidden">
-        <div id="instruction-title">Movement Dialogue</div>
-        <div class="instruction-text">
-            Move your body to shape the network.<br>
-            Expansive gestures amplify the energy.
-        </div>
-    </div>
-
-    <!-- Exercise HUD (shown during exercise mode) -->
-    <div id="exercise-hud" class="glass-panel hidden">
-        <div id="hud-exercise-name"></div>
-        <div id="hud-rep-count">
-            <span class="hud-label">Reps</span>
-            <span id="hud-reps">0</span>
-        </div>
-        <div id="hud-angle-display">
-            <span class="hud-label">Range</span>
-            <span id="hud-angle">—</span>
-        </div>
-        <div id="hud-form-cue"></div>
-        <div id="hud-ai-text"></div>
-        <div id="hud-voice-indicator" class="hidden">
-            <span class="voice-dot"></span>
-            <span>Speaking</span>
-        </div>
-    </div>
-
-    <!-- Test mode toggle -->
+    <!-- Test mode toggle panel -->
     <div id="test-mode-panel" class="glass-panel">
         <div id="test-mode-title">Test Skeleton</div>
         <div class="toggle-row">
@@ -112,10 +91,6 @@
             <span class="status-dot"></span>
             <span id="tracking-text">Initializing...</span>
         </div>
-        <div id="sensor-status" class="hidden">
-            <span class="status-dot" id="sensor-dot"></span>
-            <span id="sensor-text">IMU</span>
-        </div>
     </div>
 
     <!-- Movement metrics -->
@@ -137,9 +112,7 @@
     <!-- Control buttons -->
     <div id="control-buttons">
         <button id="pause-play-btn" class="control-button"><span>Freeze</span></button>
-        <button id="toggle-skeleton-btn" class="control-button"><span>Skeleton</span></button>
         <button id="reset-camera-btn" class="control-button"><span>Reset</span></button>
-        <button id="end-session-btn" class="control-button hidden"><span>End Session</span></button>
     </div>
 
     <!-- TensorFlow.js + MoveNet pose detection -->
@@ -158,7 +131,7 @@
     }
     </script>
 
-    <!-- Main application -->
+    <!-- Testing app -->
     <script type="module" src="main.js"></script>
 </body>
 </html>
