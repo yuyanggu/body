@@ -19,6 +19,7 @@ import { bodyState, processKeypoints, detectPose, setupCamera, setupPoseDetectio
 import { generateTestKeypoints } from './test-mode.js';
 import { setupUI, updateExerciseHUD, updateStatusUI } from './ui.js';
 import { createDataOverlay, updateDataOverlay } from './data-overlay.js';
+import { imuState } from './imu-sensor.js';
 
 // ============================================================
 // Instances
@@ -132,8 +133,14 @@ function animate() {
         // Update keypoint sampler with current body data
         keypointSampler.update(bodyState);
 
+        // Blend IMU tremor into jitter when sensor is connected
+        const effectiveJitter = imuState.connected
+            ? bodyState.globalJitter * 0.3 + imuState.tremor * 0.7
+            : bodyState.globalJitter;
+        if (imuState.connected) bodyState.globalJitter = effectiveJitter;
+
         // Update GPU particle system
-        const activity = Math.min(1.0, bodyState.globalVelocity + bodyState.globalJitter * 0.5);
+        const activity = Math.min(1.0, bodyState.globalVelocity + effectiveJitter * 0.5);
         particleSystem.update(dt, t, keypointSampler, camera, lightPosition, activity);
 
         // Exercise analysis (during exercise mode)
@@ -147,6 +154,8 @@ function animate() {
                     velocity: bodyState.globalVelocity,
                     jitter: bodyState.globalJitter,
                     rangeOfMotion: bodyState.globalRangeOfMotion,
+                    imuTremor: imuState.connected ? imuState.tremor : null,
+                    imuKneeAngle: imuState.connected ? imuState.kneeAngle : null,
                 });
             }
         }

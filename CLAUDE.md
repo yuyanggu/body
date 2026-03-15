@@ -52,6 +52,40 @@ python3 -m http.server 8080
 | `styles.css` | Dark theme, frosted glass panels, toggle switches, responsive layout |
 | `testing/index.html` | Testing page — minimal UI, status panel with FPS |
 | `testing/main.js` | Testing page orchestrator — reuses all shared modules |
+| `arduino/knee_imu_ble/knee_imu_ble.ino` | XIAO ESP32S3 + MPU-6050 — reads IMU at 50Hz, streams over BLE, prints live data to serial |
+| `arduino/mpu6050_test/mpu6050_test.ino` | I2C pin finder — scans all GPIO combos to locate MPU-6050 |
+
+## Hardware: Knee IMU (XIAO ESP32S3 + MPU-6050)
+
+A knee-worn inertial sensor streams accelerometer + gyroscope data over BLE to the web app.
+
+### Board & Wiring
+
+- **MCU**: Seeed XIAO ESP32S3
+- **IMU**: MPU-6050 (or compatible clone, WHO_AM_I may report 0x72)
+- **Connection**: 4 dupont wires (female-to-female)
+
+| MPU-6050 | XIAO ESP32S3 |
+|---|---|
+| VCC | 3V3 (NOT VUSB/5V) |
+| GND | GND |
+| SDA | D4 (GPIO5) |
+| SCL | D5 (GPIO6) |
+
+**Pin mapping note**: XIAO ESP32S3 pin labels vs GPIO numbers — D4=GPIO5, D5=GPIO6 (not GPIO6/GPIO7 as some docs suggest). Confirmed via I2C scan.
+
+### Sketch: `knee_imu_ble.ino`
+
+- Raw I2C registers — no Adafruit library (avoids `Wire.begin()` pin conflicts)
+- Reads accel/gyro at 50Hz, streams 12-byte BLE packets (int16 milli-g + milli-dps)
+- Prints live sensor data to Serial Monitor at 5Hz (human-readable)
+- BLE service UUID: `6e400001-b5a3-f393-e0a9-e50e24dcca9e`
+- Sensor config: ±8G accel, ±500 dps gyro, 21Hz DLPF bandwidth
+- Upload: hold BOOT button while plugging USB if port not detected
+
+### Sketch: `mpu6050_test.ino`
+
+Diagnostic tool — tries all GPIO pin combinations to find the MPU-6050 on I2C. Use this first if the IMU isn't responding.
 
 ## Architecture
 

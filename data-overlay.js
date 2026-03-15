@@ -239,7 +239,7 @@ function drawDataLabel(ctx, pt, index, elapsed) {
     const ly = sy + offset[1] * dist;
 
     ctx.save();
-    ctx.font = '9px monospace';
+    ctx.font = "9px 'Geist Pixel Line', monospace";
 
     // Leader line from node to label
     ctx.beginPath();
@@ -291,11 +291,11 @@ function drawMajorLabel(ctx, x, y, kp, index, elapsed) {
 
     // Joint name — brighter
     ctx.fillStyle = 'rgba(200, 220, 120, 0.8)';
-    ctx.font = '10px monospace';
+    ctx.font = "10px 'Geist Pixel Line', monospace";
     ctx.fillText(KEYPOINT_LABELS[index], x, y - 14);
 
     // Coordinate readout
-    ctx.font = '9px monospace';
+    ctx.font = "9px 'Geist Pixel Line', monospace";
     ctx.fillStyle = 'rgba(180, 200, 140, 0.5)';
     const px = kp.position3D.x.toFixed(2);
     const py = kp.position3D.y.toFixed(2);
@@ -349,7 +349,7 @@ function drawMajorLabel(ctx, x, y, kp, index, elapsed) {
 
 function drawTelemetryHeader(ctx, bodyState, elapsed, w) {
     ctx.save();
-    ctx.font = '9px monospace';
+    ctx.font = "9px 'Geist Pixel Line', monospace";
     ctx.textAlign = 'right';
 
     const x = w - 240;

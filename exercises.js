@@ -4,6 +4,8 @@
 // rep counting, and form quality analysis
 // ============================================================
 
+import { imuState } from './imu-sensor.js';
+
 // ---- Joint Angle Utility ----
 
 export function computeAngle(kpA, kpB, kpC) {
@@ -187,6 +189,12 @@ export class ExerciseAnalyzer {
         const rawAngle = computeAngle(kps[a].smoothed, kps[b].smoothed, kps[c].smoothed);
         // Smooth the angle
         this._smoothAngle = this._smoothAngle * 0.7 + rawAngle * 0.3;
+
+        // Fuse IMU knee angle for right-knee exercises when sensor is connected
+        if (imuState.connected && this._isRightKneeExercise(ex)) {
+            this._smoothAngle = this._smoothAngle * 0.4 + imuState.kneeAngle * 0.6;
+        }
+
         this.currentAngle = Math.round(this._smoothAngle);
         this._prevAngle = rawAngle;
 
@@ -271,6 +279,7 @@ export class ExerciseAnalyzer {
             repCount: this.repCount,
             phase: this.phase,
             currentAngle: this.currentAngle,
+            formAngle: this.formAngle,
             formQuality: this.formQuality,
             formCue: this.formCue,
             peakAngle: this.peakAngle,
@@ -279,6 +288,12 @@ export class ExerciseAnalyzer {
             sessionDuration: this.sessionDuration,
             isNewRange: this.isNewRange,
         };
+    }
+
+    // Check if exercise involves right knee keypoints (12=right hip, 14=right knee, 16=right ankle)
+    _isRightKneeExercise(ex) {
+        const { a, b, c } = ex.primaryAngle;
+        return [a, b, c].some(kp => kp === 12 || kp === 14 || kp === 16);
     }
 
     stop() {

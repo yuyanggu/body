@@ -1,3 +1,47 @@
+/* =========================================
+   Geist Pixel Fonts (local)
+   ========================================= */
+
+@font-face {
+    font-family: 'Geist Pixel Line';
+    src: url('fonts/GeistPixel-Line.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Geist Pixel Grid';
+    src: url('fonts/GeistPixel-Grid.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Geist Pixel Circle';
+    src: url('fonts/GeistPixel-Circle.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Geist Pixel Square';
+    src: url('fonts/GeistPixel-Square.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Geist Pixel Triangle';
+    src: url('fonts/GeistPixel-Triangle.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 :root {
     --glass-bg: rgba(255, 255, 255, 0.03);
     --glass-border: rgba(255, 255, 255, 0.08);
@@ -5,6 +49,7 @@
     --neon-accent: #667eea;
     --text-main: rgba(255, 255, 255, 0.9);
     --text-muted: rgba(255, 255, 255, 0.6);
+    --font-pixel: 'Geist Pixel Line', monospace;
 }
 
 * {
@@ -18,7 +63,7 @@
 body {
     overflow: hidden;
     background: #050508;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-pixel);
     color: var(--text-main);
 }
 
@@ -141,6 +186,7 @@ canvas {
 
 #test-mode-title {
     font-size: 12px;
+    font-family: var(--font-pixel);
     text-transform: uppercase;
     letter-spacing: 2px;
     color: var(--text-muted);
@@ -202,6 +248,7 @@ canvas {
 
 .toggle-label {
     font-size: 13px;
+    font-family: var(--font-pixel);
     color: rgba(255,255,255,0.7);
     font-weight: 300;
     border-radius: 3px;
@@ -238,7 +285,7 @@ canvas {
     padding: 12px 24px;
     border-radius: 50px;
     cursor: pointer;
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-pixel);
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.5px;
@@ -304,6 +351,7 @@ canvas {
     align-items: center;
     gap: 8px;
     font-size: 11px;
+    font-family: var(--font-pixel);
     text-transform: uppercase;
     letter-spacing: 1.5px;
     color: var(--text-muted);
@@ -419,6 +467,7 @@ canvas {
     align-items: center;
     gap: 8px;
     font-size: 11px;
+    font-family: var(--font-pixel);
     text-transform: uppercase;
     letter-spacing: 1px;
     color: var(--text-muted);
@@ -542,6 +591,30 @@ canvas {
 
 .exercise-overlay-footer {
     margin-top: 8px;
+    display: flex;
+    gap: 12px;
+}
+
+/* =========================================
+   Sensor Status
+   ========================================= */
+
+#sensor-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0 4px;
+    transition: opacity 0.3s ease;
+}
+
+#sensor-status.hidden {
+    display: none;
 }
 
 /* =========================================
@@ -593,7 +666,7 @@ canvas {
     border-radius: 12px;
     padding: 12px 16px;
     color: var(--text-main);
-    font-family: 'Outfit', sans-serif;
+    font-family: var(--font-pixel);
     font-size: 14px;
     outline: none;
     transition: border-color 0.3s ease;
@@ -652,6 +725,7 @@ canvas {
 
 .hud-label {
     font-size: 11px;
+    font-family: var(--font-pixel);
     text-transform: uppercase;
     letter-spacing: 1.5px;
     color: var(--text-muted);
@@ -660,6 +734,7 @@ canvas {
 
 #hud-reps {
     font-size: 32px;
+    font-family: var(--font-pixel);
     font-weight: 200;
     color: var(--text-main);
     line-height: 1;
@@ -667,6 +742,7 @@ canvas {
 
 #hud-angle {
     font-size: 18px;
+    font-family: var(--font-pixel);
     font-weight: 300;
     color: var(--text-muted);
 }

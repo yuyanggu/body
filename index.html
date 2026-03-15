@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Body Neural Network</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -31,6 +28,9 @@
             <div class="exercise-overlay-subtitle">Select an exercise to begin your session</div>
             <div id="exercise-grid"></div>
             <div class="exercise-overlay-footer">
+                <button id="sensor-connect-btn" class="control-button hidden">
+                    <span id="sensor-btn-label">Connect Sensor</span>
+                </button>
                 <button id="api-key-btn" class="control-button">
                     <span id="api-key-btn-label">Set API Key</span>
                 </button>
@@ -111,6 +111,10 @@
         <div id="tracking-status">
             <span class="status-dot"></span>
             <span id="tracking-text">Initializing...</span>
+        </div>
+        <div id="sensor-status" class="hidden">
+            <span class="status-dot" id="sensor-dot"></span>
+            <span id="sensor-text">IMU</span>
         </div>
     </div>
 

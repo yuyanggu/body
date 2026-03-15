@@ -5,12 +5,14 @@
 import { EXERCISES } from './exercises.js';
 import { config } from './config.js';
 import { bodyState, setupCamera, setupPoseDetection, hasDetector } from './pose-detection.js';
+import { imuState, isBLEAvailable, connectSensor, disconnectSensor } from './imu-sensor.js';
 
 export function setupUI(deps) {
     const { exerciseAnalyzer, aiCompanion, controls, camera, renderer, composer, bloomPass } = deps;
 
     populateExerciseGrid(exerciseAnalyzer, aiCompanion);
     setupApiKeyUI(aiCompanion);
+    setupSensorUI();
 
     document.getElementById('end-session-btn').addEventListener('click', e => {
         e.stopPropagation();
@@ -74,6 +76,8 @@ export function setupUI(deps) {
         composer.setSize(window.innerWidth, window.innerHeight);
         bloomPass.resolution.set(window.innerWidth, window.innerHeight);
     });
+
+    // Sensor status in updateStatusUI is handled below
 
     // AI companion text updates
     aiCompanion.onTextUpdate = (text) => {
@@ -149,6 +153,47 @@ export function updateStatusUI() {
     document.getElementById('metric-velocity').style.width = `${bodyState.globalVelocity * 100}%`;
     document.getElementById('metric-range').style.width = `${bodyState.globalRangeOfMotion * 100}%`;
     document.getElementById('metric-jitter').style.width = `${bodyState.globalJitter * 100}%`;
+
+    // Sensor status
+    const sensorStatus = document.getElementById('sensor-status');
+    const sensorDot = document.getElementById('sensor-dot');
+    if (sensorStatus && sensorDot) {
+        if (imuState.connected) {
+            sensorStatus.classList.remove('hidden');
+            sensorDot.classList.add('tracking');
+        } else {
+            sensorStatus.classList.add('hidden');
+            sensorDot.classList.remove('tracking');
+        }
+    }
+}
+
+function setupSensorUI() {
+    const btn = document.getElementById('sensor-connect-btn');
+    if (!btn) return;
+
+    // Only show if Web Bluetooth is available
+    if (isBLEAvailable()) {
+        btn.classList.remove('hidden');
+    }
+
+    btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const label = document.getElementById('sensor-btn-label');
+        if (imuState.connected) {
+            disconnectSensor();
+            label.textContent = 'Connect Sensor';
+        } else {
+            label.textContent = 'Connecting...';
+            try {
+                await connectSensor();
+                label.textContent = 'Disconnect Sensor';
+            } catch (err) {
+                label.textContent = 'Connect Sensor';
+                console.warn('Sensor connection failed:', err);
+            }
+        }
+    });
 }
 
 function setupApiKeyUI(aiCompanion) {
