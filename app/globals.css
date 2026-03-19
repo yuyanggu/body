@@ -4,7 +4,7 @@
 
 @font-face {
     font-family: 'Geist Pixel Line';
-    src: url('fonts/GeistPixel-Line.woff2') format('woff2');
+    src: url('/fonts/GeistPixel-Line.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -12,7 +12,7 @@
 
 @font-face {
     font-family: 'Geist Pixel Grid';
-    src: url('fonts/GeistPixel-Grid.woff2') format('woff2');
+    src: url('/fonts/GeistPixel-Grid.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -20,7 +20,7 @@
 
 @font-face {
     font-family: 'Geist Pixel Circle';
-    src: url('fonts/GeistPixel-Circle.woff2') format('woff2');
+    src: url('/fonts/GeistPixel-Circle.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -28,7 +28,7 @@
 
 @font-face {
     font-family: 'Geist Pixel Square';
-    src: url('fonts/GeistPixel-Square.woff2') format('woff2');
+    src: url('/fonts/GeistPixel-Square.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -36,7 +36,7 @@
 
 @font-face {
     font-family: 'Geist Pixel Triangle';
-    src: url('fonts/GeistPixel-Triangle.woff2') format('woff2');
+    src: url('/fonts/GeistPixel-Triangle.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -83,8 +83,7 @@ canvas {
    ========================================= */
 
 .glass-panel {
-    backdrop-filter: blur(24px) saturate(120%);
-    -webkit-backdrop-filter: blur(24px) saturate(120%);
+    backdrop-filter: blur(6px) saturate(120%);
     background: linear-gradient(
         145deg,
         rgba(255, 255, 255, 0.05) 0%,
@@ -443,23 +442,36 @@ canvas {
 }
 
 /* =========================================
-   Movement Metrics (subtle display)
+   Sensor HUD (body metrics + IMU)
    ========================================= */
 
-#movement-metrics {
+#sensor-hud {
     position: absolute;
     bottom: 32px;
     left: 32px;
     z-index: 10;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    opacity: 0.6;
+    gap: 8px;
+    opacity: 0.7;
     transition: opacity 0.3s ease;
+    max-width: 300px;
 }
 
-#movement-metrics:hover {
+#sensor-hud:hover {
     opacity: 1;
+}
+
+.sensor-hud-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sensor-hud-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 4px 0;
 }
 
 .metric {
@@ -490,6 +502,139 @@ canvas {
     width: 0%;
 }
 
+/* IMU Header */
+.imu-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+}
+
+.imu-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 6px #4ade80;
+    animation: imu-pulse 2s ease-in-out infinite;
+}
+
+@keyframes imu-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Angle gauge + tremor row */
+.imu-main-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.imu-angle-gauge {
+    position: relative;
+    width: 72px;
+    height: 48px;
+}
+
+.imu-angle-value {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    line-height: 1;
+}
+
+.imu-angle-number {
+    font-size: 18px;
+    font-family: var(--font-pixel);
+    color: var(--text-main);
+    font-weight: 400;
+}
+
+.imu-angle-unit {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-left: 1px;
+}
+
+.imu-tremor-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.imu-tremor-bar {
+    width: 100%;
+}
+
+.imu-tremor-fill {
+    transition: width 0.15s ease, background 0.3s ease;
+}
+
+.imu-tremor-value {
+    font-size: 10px;
+    font-family: var(--font-pixel);
+    color: var(--text-muted);
+}
+
+.imu-label {
+    font-size: 10px;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+/* Raw data grid */
+.imu-raw-grid {
+    display: flex;
+    gap: 16px;
+}
+
+.imu-raw-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.imu-raw-label {
+    font-size: 9px;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.imu-raw-val {
+    font-size: 10px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 0.5px;
+}
+
+/* Rolling graph */
+.imu-graph-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.imu-rolling-graph {
+    width: 100%;
+    height: 60px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
 /* =========================================
    Exercise Selection Overlay
    ========================================= */
@@ -501,7 +646,7 @@ canvas {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(5, 5, 8, 0.85);
+    background: rgba(5, 5, 8, 0.9);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     transition: opacity 0.6s ease, visibility 0.6s ease;
@@ -548,9 +693,8 @@ canvas {
 }
 
 .exercise-card {
-    backdrop-filter: blur(24px) saturate(120%);
-    -webkit-backdrop-filter: blur(24px) saturate(120%);
-    background: linear-gradient(145deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    backdrop-filter: blur(10px) saturate(160%);
+    background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
     border: 1px solid var(--glass-border);
     border-top: 1px solid var(--glass-highlight);
     border-left: 1px solid var(--glass-highlight);
@@ -628,7 +772,7 @@ canvas {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0,0,0,0.6);
+    background: rgba(0, 0, 0, 0.7);
     transition: opacity 0.3s ease, visibility 0.3s ease;
 }
 
@@ -645,6 +789,20 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    backdrop-filter: blur(14px) saturate(120%);
+    background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.05) 0%,
+        rgba(255, 255, 255, 0.01) 100%
+    );
+    border: 1px solid var(--glass-border);
+    border-top: 1px solid var(--glass-highlight);
+    border-left: 1px solid var(--glass-highlight);
+    border-radius: 24px;
+    box-shadow:
+        0 20px 40px rgba(0, 0, 0, 0.4),
+        inset 0 0 20px rgba(255, 255, 255, 0.02);
+    color: var(--text-main);
 }
 
 .api-key-modal-title {
@@ -855,5 +1013,377 @@ canvas {
 
     #movement-metrics {
         display: none;
+    }
+}
+
+/* =========================================
+   Testing Status Panel
+   ========================================= */
+
+#testing-status {
+    position: fixed;
+    top: 24px;
+    left: 24px;
+    padding: 16px 20px;
+    font-size: 13px;
+    font-family: var(--font-pixel);
+    color: rgba(255,255,255,0.7);
+    font-weight: 300;
+    z-index: 10;
+}
+
+#testing-status .title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+#testing-status .status-line {
+    margin-bottom: 6px;
+}
+
+#testing-status .status-line span {
+    color: white;
+    font-weight: 500;
+}
+
+/* =========================================
+   Shader Control Panel
+   ========================================= */
+
+.shader-control-panel {
+    position: fixed;
+    top: 24px;
+    width: 260px;
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
+    z-index: 20;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.shader-control-panel-a {
+    right: 264px;
+    border-top: 3px solid rgba(167, 139, 250, 0.5);
+}
+
+.shader-control-panel-b {
+    right: 536px;
+    border-top: 3px solid rgba(79, 172, 254, 0.5);
+}
+
+.shader-control-panel:hover {
+    transform: none;
+}
+
+.shader-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+}
+
+.shader-panel-title {
+    font-size: 11px;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.shader-panel-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.shader-panel-btn {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text-muted);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.shader-panel-btn:hover {
+    background: rgba(255,255,255,0.12);
+    color: white;
+    border-color: rgba(255,255,255,0.2);
+}
+
+.shader-panel-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+    pointer-events: none;
+}
+
+.shader-panel-btn.has-changes {
+    border-color: rgba(167, 139, 250, 0.3);
+    color: rgba(167, 139, 250, 0.9);
+    position: relative;
+}
+
+.shader-panel-btn.has-changes:hover {
+    background: rgba(167, 139, 250, 0.15);
+    border-color: rgba(167, 139, 250, 0.5);
+    color: white;
+}
+
+.shader-panel-btn.copied {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.4);
+    color: #22c55e;
+}
+
+.shader-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: rgba(167, 139, 250, 0.85);
+    color: white;
+    font-family: var(--font-pixel);
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
+    text-align: center;
+    border-radius: 7px;
+    padding: 0 3px;
+    pointer-events: none;
+}
+
+.shader-panel-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 0;
+    flex: 1;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+
+.shader-panel-body::-webkit-scrollbar {
+    width: 4px;
+}
+
+.shader-panel-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.shader-panel-body::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
+.shader-panel-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.shader-section {
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.shader-section:last-child {
+    border-bottom: none;
+}
+
+.shader-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-family: var(--font-pixel);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.shader-section-header:hover {
+    color: rgba(255,255,255,0.8);
+}
+
+.shader-chevron {
+    transition: transform 0.25s ease;
+}
+
+.shader-chevron.collapsed {
+    transform: rotate(-90deg);
+}
+
+.shader-section-body {
+    padding: 0 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.shader-slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.shader-slider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.shader-ctrl-label {
+    font-size: 11px;
+    font-family: var(--font-pixel);
+    color: rgba(255,255,255,0.55);
+    font-weight: 300;
+}
+
+.shader-ctrl-value {
+    font-size: 11px;
+    font-family: var(--font-pixel);
+    color: rgba(167, 139, 250, 0.8);
+    font-weight: 400;
+    min-width: 40px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.shader-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 3px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.shader-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(167, 139, 250, 0.7);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 0 6px rgba(167, 139, 250, 0.3);
+}
+
+.shader-slider::-webkit-slider-thumb:hover {
+    background: rgba(167, 139, 250, 1);
+    transform: scale(1.3);
+    box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+}
+
+.shader-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: rgba(167, 139, 250, 0.7);
+    border: 1.5px solid rgba(255,255,255,0.3);
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(167, 139, 250, 0.3);
+}
+
+.shader-toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+}
+
+.toggle-switch.small {
+    width: 36px;
+    height: 20px;
+}
+
+.toggle-switch.small .toggle-slider::before {
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+}
+
+.toggle-switch.small input:checked + .toggle-slider::before {
+    transform: translateX(16px);
+}
+
+.shader-panel-toggle {
+    position: fixed;
+    top: 24px;
+    z-index: 20;
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    color: var(--text-muted);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.shader-panel-toggle-a {
+    right: 264px;
+    border-top: 3px solid rgba(167, 139, 250, 0.5);
+}
+
+.shader-panel-toggle-b {
+    right: 316px;
+    border-top: 3px solid rgba(79, 172, 254, 0.5);
+}
+
+.shader-panel-toggle:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+    border-color: rgba(255,255,255,0.25);
+    box-shadow: 0 0 20px rgba(167, 139, 250, 0.2);
+}
+
+@media (max-width: 640px) {
+    .shader-control-panel {
+        right: 16px !important;
+        left: 16px;
+        top: auto;
+        bottom: 100px;
+        width: auto;
+        max-height: 40vh;
+    }
+
+    .shader-control-panel-b {
+        bottom: 55vh;
+    }
+
+    .shader-panel-toggle {
+        right: 16px !important;
+        top: auto;
+        bottom: 100px;
+    }
+
+    .shader-panel-toggle-b {
+        right: 64px !important;
     }
 }
