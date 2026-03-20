@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1800">
+<title>System Architecture — Residual Motion</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --teal: #00d4aa;
+    --blue: #4488ff;
+    --purple: #8844ff;
+    --magenta: #ff44aa;
+    --amber: #ffaa00;
+    --bg: #0a0a0a;
+    --surface: #111113;
+    --surface-2: #18181b;
+    --border: #222226;
+    --border-light: #2a2a2e;
+    --text: #e4e4e7;
+    --text-dim: #71717a;
+    --text-muted: #52525b;
+  }
+
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    width: 1800px;
+    height: 1200px;
+    overflow: hidden;
+  }
+
+  body {
+    padding: 44px 52px 36px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .header-left h1 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 300;
+    font-size: 26px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .header-left h1 span {
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .header-left .subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-top: 5px;
+    letter-spacing: 0.06em;
+  }
+
+  .legend {
+    display: flex;
+    gap: 22px;
+    align-items: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9.5px;
+    font-weight: 400;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .legend-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  /* ── Diagram ── */
+  .diagram {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 290px 270px 380px 1fr;
+    gap: 0;
+    position: relative;
+    min-height: 0;
+  }
+
+  .column {
+    padding: 0 18px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .column:not(:last-child) {
+    border-right: 1px solid var(--border);
+  }
+
+  .col-header {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+
+  .col-header.input { color: var(--teal); border-bottom: 1px solid rgba(0,212,170,0.2); }
+  .col-header.processing { color: var(--blue); border-bottom: 1px solid rgba(68,136,255,0.2); }
+  .col-header.visualization { color: var(--purple); border-bottom: 1px solid rgba(136,68,255,0.2); }
+  .col-header.ai { color: var(--amber); border-bottom: 1px solid rgba(255,170,0,0.2); }
+
+  /* ── Nodes ── */
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px 11px;
+    margin-bottom: 10px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .node::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 1px;
+  }
+
+  .node .title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 3px;
+  }
+
+  .node .desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+
+  .node .spec {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8.5px;
+    font-weight: 300;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  .node.teal::before { background: var(--teal); }
+  .node.teal .title { color: var(--teal); }
+  .node.blue::before { background: var(--blue); }
+  .node.blue .title { color: var(--blue); }
+  .node.purple::before { background: var(--purple); }
+  .node.purple .title { color: var(--purple); }
+  .node.amber::before { background: var(--amber); }
+  .node.amber .title { color: var(--amber); }
+
+  .node.dashed {
+    background: transparent;
+    border-style: dashed;
+    border-color: rgba(255,170,0,0.2);
+  }
+
+  /* ── Group Labels ── */
+  .group-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 6px;
+    margin-bottom: 8px;
+    padding-left: 3px;
+    flex-shrink: 0;
+  }
+
+  .spacer { height: 6px; flex-shrink: 0; }
+  .spacer-lg { height: 14px; flex-shrink: 0; }
+
+  /* ── Pipeline (visualization column) ── */
+  .pipeline-node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 11px 14px;
+    margin-bottom: 10px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .pipeline-node::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--purple);
+  }
+
+  .pipeline-node .title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--purple);
+    margin-bottom: 8px;
+  }
+
+  .pipeline-steps {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .pipeline-step {
+    background: var(--surface-2);
+    border: 1px solid rgba(136,68,255,0.15);
+    border-radius: 3px;
+    padding: 4px 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 400;
+    color: rgba(136,68,255,0.65);
+    white-space: nowrap;
+    text-align: center;
+    line-height: 1.35;
+  }
+
+  .pipeline-arrow {
+    color: rgba(136,68,255,0.3);
+    font-size: 9px;
+    flex-shrink: 0;
+  }
+
+  /* ── Feedback Section ── */
+  .feedback-section {
+    flex-shrink: 0;
+    padding-top: 16px;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+    gap: 56px;
+  }
+
+  .feedback-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .feedback-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .feedback-label {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .feedback-label .fb-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+
+  .feedback-label .fb-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 400;
+    color: var(--text-muted);
+  }
+
+  .future { opacity: 0.45; }
+
+  /* ── Color Swatch Row ── */
+  .swatch-row {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    margin-top: 6px;
+  }
+
+  .swatch {
+    width: 16px;
+    height: 8px;
+    border-radius: 2px;
+  }
+
+  .swatch-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7.5px;
+    color: var(--text-muted);
+    margin-left: 4px;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    position: absolute;
+    bottom: 18px;
+    right: 52px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* ── SVG Connector Overlay ── */
+  #connectors-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1800px;
+    height: 1200px;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #connectors-svg line, #connectors-svg path {
+    fill: none;
+    stroke-dasharray: 5 3;
+  }
+
+</style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>System Architecture &mdash; <span>Residual Motion</span></h1>
+      <div class="subtitle">Prompted by the Body &ensp;&middot;&ensp; ACL Recovery &ensp;&middot;&ensp; Embodied AI Interaction</div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Input Sensors</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Processing</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>Visualization</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>AI Companion</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--magenta)"></div>Feedback</div>
+    </div>
+  </div>
+
+  <!-- Diagram Grid -->
+  <div class="diagram" id="diagram">
+
+    <!-- ═══════ COLUMN 1: INPUT ═══════ -->
+    <div class="column">
+      <div class="col-header input">Input Layer</div>
+
+      <div class="group-label">Camera Pipeline</div>
+
+      <div class="node teal" id="n-webcam">
+        <div class="title">Webcam Camera</div>
+        <div class="desc">Browser getUserMedia video stream</div>
+        <div class="spec">640 &times; 480 &middot; 30 fps</div>
+      </div>
+
+      <div class="node teal" id="n-movenet">
+        <div class="title">MoveNet Pose Detection</div>
+        <div class="desc">TensorFlow.js SINGLEPOSE_LIGHTNING via CDN ESM</div>
+        <div class="spec">EMA smoothing &middot; confidence &ge; 0.3</div>
+      </div>
+
+      <div class="node teal" id="n-keypoints">
+        <div class="title">17 Body Keypoints</div>
+        <div class="desc">Nose, eyes, ears, shoulders, elbows, wrists, hips, knees, ankles</div>
+        <div class="spec">processKeypoints() &mdash; every frame</div>
+      </div>
+
+      <div class="spacer-lg"></div>
+      <div class="group-label">Hardware Sensor</div>
+
+      <div class="node teal" id="n-imu">
+        <div class="title">Knee IMU Sensor</div>
+        <div class="desc">XIAO ESP32S3 + MPU-6050 strapped below kneecap</div>
+        <div class="spec">&plusmn;8G accel &middot; &plusmn;500&deg;/s gyro &middot; 21Hz DLPF</div>
+      </div>
+
+      <div class="node teal" id="n-imu-stream">
+        <div class="title">Binary WebSocket Stream</div>
+        <div class="desc">12-byte packets: 3-axis accel + 3-axis gyro</div>
+        <div class="spec">50 Hz &middot; WiFi port 81 &middot; auto-reconnect</div>
+      </div>
+    </div>
+
+    <!-- ═══════ COLUMN 2: PROCESSING ═══════ -->
+    <div class="column">
+      <div class="col-header processing">Processing Layer</div>
+
+      <div class="group-label">Keypoint Samplers &rarr; GPU DataTexture</div>
+
+      <div class="node blue" id="n-body-sampler">
+        <div class="title">Body Fill Sampler</div>
+        <div class="desc">Interpolated body surface for torso volume, limb cylinders, depth</div>
+        <div class="spec">256 slots &rarr; 16&times;16 texture &middot; position + velocity</div>
+      </div>
+
+      <div class="node blue" id="n-skel-sampler">
+        <div class="title">Skeleton Sampler</div>
+        <div class="desc">Raw joints + bone interpolation for wireframe tracing</div>
+        <div class="spec">17 joints + 8 pts &times; 16 bones = 145 active slots</div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="group-label">Movement Analysis</div>
+
+      <div class="node blue" id="n-metrics">
+        <div class="title">Movement Metrics</div>
+        <div class="desc">Global velocity, jitter, and range of motion per frame</div>
+        <div class="spec">bodyActivity = velocity + jitter &times; 0.5 (clamped 0&ndash;1)</div>
+      </div>
+
+      <div class="spacer-lg"></div>
+      <div class="group-label">IMU Signal Processing</div>
+
+      <div class="node blue" id="n-comp-filter">
+        <div class="title">Complementary Filter</div>
+        <div class="desc">Fuses accelerometer gravity + gyroscope angular rate</div>
+        <div class="spec">Output: knee flexion angle in degrees</div>
+      </div>
+
+      <div class="node blue" id="n-tremor">
+        <div class="title">Tremor Detection</div>
+        <div class="desc">Rolling standard deviation of accelerometer signal</div>
+        <div class="spec">Captures involuntary micro-tremor amplitude</div>
+      </div>
+    </div>
+
+    <!-- ═══════ COLUMN 3: VISUALIZATION ═══════ -->
+    <div class="column">
+      <div class="col-header visualization">Visualization Layer</div>
+
+      <div class="group-label">Dual Particle Systems</div>
+
+      <div class="node purple" id="n-layer-a">
+        <div class="title">Layer A &mdash; Body Cloud</div>
+        <div class="desc">Dense particle fill of full body silhouette with depth volume</div>
+        <div class="spec">512&times;512 = 262,144 particles &middot; body fill sampler</div>
+      </div>
+
+      <div class="node purple" id="n-layer-b">
+        <div class="title">Layer B &mdash; Skeleton Wireframe</div>
+        <div class="desc">Sparse particles tracing joints and connecting bone lines</div>
+        <div class="spec">Configurable grid size &middot; raw keypoint sampler</div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="group-label">GPU Render Pipeline (per frame, &times;2 layers)</div>
+
+      <div class="pipeline-node" id="n-pipeline">
+        <div class="title">Position Compute &rarr; Sort &rarr; Shadow &rarr; Render</div>
+        <div class="pipeline-steps">
+          <div class="pipeline-step">Curl Noise<br>Drift</div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-step">Keypoint<br>Attraction</div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-step">Bitonic<br>Depth Sort</div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-step">Shadow<br>Accumulation</div>
+          <div class="pipeline-arrow">&rarr;</div>
+          <div class="pipeline-step">Unreal<br>Bloom</div>
+        </div>
+      </div>
+
+      <div class="node purple" id="n-render">
+        <div class="title">Particle Rendering</div>
+        <div class="desc">Sphere-rasterized points with Lambertian diffuse + Blinn-Phong specular + self-shadowing</div>
+      </div>
+
+      <div class="node purple" id="n-palette">
+        <div class="title">Velocity Color Ramp</div>
+        <div class="desc">5-stop gradient baked into fragment shader, driven by particle speed</div>
+        <div class="swatch-row">
+          <div class="swatch" style="background:#00d4aa"></div>
+          <div class="swatch" style="background:#4488ff"></div>
+          <div class="swatch" style="background:#8844ff"></div>
+          <div class="swatch" style="background:#ff44aa"></div>
+          <div class="swatch" style="background:#ffaa00"></div>
+          <span class="swatch-label">still &rarr; moving</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════ COLUMN 4: AI ═══════ -->
+    <div class="column">
+      <div class="col-header ai">AI Companion Layer</div>
+
+      <div class="group-label">Exercise Analysis</div>
+
+      <div class="node amber" id="n-exercise">
+        <div class="title">Exercise Analyzer</div>
+        <div class="desc">6 ACL exercises: angle tracking, rep counting, form quality</div>
+        <div class="spec">Form quality 0&ndash;1 &middot; milestone events</div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="group-label">Contemplative AI</div>
+
+      <div class="node amber" id="n-ai">
+        <div class="title">AI Companion</div>
+        <div class="desc">Not a coach. A quiet observer that notices movement qualities and reflects them back.</div>
+        <div class="spec">GPT-4o-mini &middot; min 22s between reflections</div>
+      </div>
+
+      <div class="node amber" id="n-ai-context">
+        <div class="title">Context Assembly</div>
+        <div class="desc">Exercise state + velocity + jitter + range of motion + IMU tremor + knee angle</div>
+        <div class="spec">Body as continuous unprompted context to AI</div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="group-label">Voice Output</div>
+
+      <div class="node amber" id="n-voice">
+        <div class="title">Voice Synthesis</div>
+        <div class="desc">OpenAI TTS-1, Nova voice, queue-managed playback</div>
+        <div class="spec">0.98&times; speed &middot; 1&ndash;2 spoken sentences</div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="group-label">Trigger Conditions</div>
+
+      <div class="node amber dashed" id="n-triggers">
+        <div class="title" style="font-size:10px;">The AI Speaks When&hellip;</div>
+        <div class="desc" style="line-height:1.65;">
+          First rep completed<br>
+          Every 5th rep milestone<br>
+          New range of motion achieved<br>
+          Form quality drops below 50%<br>
+          Ambient observations (~40s intervals)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback to Body -->
+  <div class="feedback-section">
+    <div class="feedback-item">
+      <div class="feedback-icon" style="border-color:rgba(136,68,255,0.3);">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--purple)" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div class="feedback-label">
+        <span class="fb-title" style="color:var(--purple)">Particle Visualization</span>
+        <span class="fb-desc">Seen by user &mdash; body mirrored as living particle cloud</span>
+      </div>
+    </div>
+    <div class="feedback-item">
+      <div class="feedback-icon" style="border-color:rgba(255,170,0,0.3);">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <div class="feedback-label">
+        <span class="fb-title" style="color:var(--amber)">Voice Reflection</span>
+        <span class="fb-desc">Heard by user &mdash; AI speaks what it observes</span>
+      </div>
+    </div>
+    <div class="feedback-item future">
+      <div class="feedback-icon" style="border-color:rgba(255,68,170,0.2);">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--magenta)" stroke-width="1.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+      <div class="feedback-label">
+        <span class="fb-title" style="color:var(--magenta)">Haptic Vibration</span>
+        <span class="fb-desc">Future &mdash; feel the visualization on skin</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SVG Connectors (drawn by JS to match actual node positions) -->
+  <svg id="connectors-svg" viewBox="0 0 1800 1200">
+    <defs>
+      <marker id="ah-teal" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto" markerUnits="strokeWidth">
+        <polygon points="0 0, 6 2, 0 4" fill="rgba(0,212,170,0.5)"/>
+      </marker>
+      <marker id="ah-blue" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto" markerUnits="strokeWidth">
+        <polygon points="0 0, 6 2, 0 4" fill="rgba(68,136,255,0.5)"/>
+      </marker>
+      <marker id="ah-purple" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto" markerUnits="strokeWidth">
+        <polygon points="0 0, 6 2, 0 4" fill="rgba(136,68,255,0.5)"/>
+      </marker>
+      <marker id="ah-amber" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto" markerUnits="strokeWidth">
+        <polygon points="0 0, 6 2, 0 4" fill="rgba(255,170,0,0.5)"/>
+      </marker>
+    </defs>
+  </svg>
+
+  <div class="footer">Yuyang Gu &ensp;&middot;&ensp; Prompted by the Body &ensp;&middot;&ensp; 2025</div>
+
+<script>
+// Draw connector lines from actual rendered node positions
+window.addEventListener('load', () => {
+  const svg = document.getElementById('connectors-svg');
+
+  function pos(id) {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      cx: r.left + r.width / 2,
+      cy: r.top + r.height / 2,
+      top: r.top,
+      bottom: r.bottom,
+      left: r.left,
+      right: r.right,
+      w: r.width,
+      h: r.height
+    };
+  }
+
+  function line(x1, y1, x2, y2, color, marker) {
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', x1); l.setAttribute('y1', y1);
+    l.setAttribute('x2', x2); l.setAttribute('y2', y2);
+    l.setAttribute('stroke', color);
+    l.setAttribute('stroke-width', '1');
+    l.setAttribute('stroke-dasharray', '5 3');
+    if (marker) l.setAttribute('marker-end', `url(#${marker})`);
+    svg.appendChild(l);
+  }
+
+  function curve(d, color, marker) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p.setAttribute('d', d);
+    p.setAttribute('stroke', color);
+    p.setAttribute('stroke-width', '1');
+    p.setAttribute('stroke-dasharray', '5 3');
+    p.setAttribute('fill', 'none');
+    if (marker) p.setAttribute('marker-end', `url(#${marker})`);
+    svg.appendChild(p);
+  }
+
+  const tc = 'rgba(0,212,170,0.25)';
+  const bc = 'rgba(68,136,255,0.25)';
+  const pc = 'rgba(136,68,255,0.25)';
+  const ac = 'rgba(255,170,0,0.25)';
+
+  // Vertical: Webcam → MoveNet → Keypoints
+  const webcam = pos('n-webcam'), movenet = pos('n-movenet'), kp = pos('n-keypoints');
+  if (webcam && movenet) line(webcam.cx, webcam.bottom, movenet.cx, movenet.top, tc, 'ah-teal');
+  if (movenet && kp) line(movenet.cx, movenet.bottom, kp.cx, kp.top, tc, 'ah-teal');
+
+  // Vertical: IMU → IMU Stream
+  const imu = pos('n-imu'), imuS = pos('n-imu-stream');
+  if (imu && imuS) line(imu.cx, imu.bottom, imuS.cx, imuS.top, tc, 'ah-teal');
+
+  // Horizontal: Keypoints → Body Sampler
+  const bs = pos('n-body-sampler');
+  if (kp && bs) line(kp.right, kp.cy - 10, bs.left, bs.cy, tc, 'ah-blue');
+
+  // Horizontal: Keypoints → Skeleton Sampler
+  const ss = pos('n-skel-sampler');
+  if (kp && ss) line(kp.right, kp.cy + 5, ss.left, ss.cy, tc, 'ah-blue');
+
+  // Horizontal: Keypoints → Movement Metrics
+  const mm = pos('n-metrics');
+  if (kp && mm) line(kp.right, kp.bottom - 5, mm.left, mm.cy, tc, 'ah-blue');
+
+  // Horizontal: IMU Stream → Comp Filter
+  const cf = pos('n-comp-filter');
+  if (imuS && cf) line(imuS.right, imuS.cy - 5, cf.left, cf.cy, tc, 'ah-blue');
+
+  // Horizontal: IMU Stream → Tremor
+  const tr = pos('n-tremor');
+  if (imuS && tr) line(imuS.right, imuS.cy + 5, tr.left, tr.cy, tc, 'ah-blue');
+
+  // Horizontal: Body Sampler → Layer A
+  const la = pos('n-layer-a');
+  if (bs && la) line(bs.right, bs.cy, la.left, la.cy, bc, 'ah-purple');
+
+  // Horizontal: Skeleton Sampler → Layer B
+  const lb = pos('n-layer-b');
+  if (ss && lb) line(ss.right, ss.cy, lb.left, lb.cy, bc, 'ah-purple');
+
+  // Vertical: Layer A → Pipeline
+  const pipe = pos('n-pipeline');
+  if (la && pipe) line(la.cx - 20, la.bottom, pipe.cx - 20, pipe.top, pc, 'ah-purple');
+
+  // Vertical: Layer B → Pipeline
+  if (lb && pipe) line(lb.cx + 20, lb.bottom, pipe.cx + 20, pipe.top, pc, 'ah-purple');
+
+  // Vertical: Pipeline → Render
+  const rn = pos('n-render');
+  if (pipe && rn) line(pipe.cx, pipe.bottom, rn.cx, rn.top, pc, 'ah-purple');
+
+  // Vertical: Render → Palette
+  const pl = pos('n-palette');
+  if (rn && pl) line(rn.cx, rn.bottom, pl.cx, pl.top, pc, 'ah-purple');
+
+  // Movement Metrics → bodyActivity modulation (to visualization column)
+  if (mm && la) {
+    curve(
+      `M ${mm.right} ${mm.cy - 8} C ${mm.right + 30} ${mm.cy - 8}, ${la.left - 30} ${la.bottom + 10}, ${la.left} ${la.bottom + 10}`,
+      'rgba(68,136,255,0.15)', 'ah-purple'
+    );
+  }
+
+  // Movement Metrics → Exercise Analyzer (curve up-right to col 4)
+  const ex = pos('n-exercise');
+  if (mm && ex) {
+    curve(
+      `M ${mm.right} ${mm.cy} C ${mm.right + 80} ${mm.cy}, ${ex.left - 80} ${ex.cy}, ${ex.left} ${ex.cy}`,
+      'rgba(68,136,255,0.15)', 'ah-amber'
+    );
+  }
+
+  // IMU signals → AI Context (curved connections from col 2 to col 4)
+  const ctx = pos('n-ai-context');
+  if (cf && ctx) {
+    curve(
+      `M ${cf.right} ${cf.cy} C ${cf.right + 120} ${cf.cy}, ${ctx.left - 120} ${ctx.cy - 10}, ${ctx.left} ${ctx.cy - 10}`,
+      'rgba(68,136,255,0.12)', 'ah-amber'
+    );
+  }
+  if (tr && ctx) {
+    curve(
+      `M ${tr.right} ${tr.cy} C ${tr.right + 140} ${tr.cy}, ${ctx.left - 100} ${ctx.cy + 10}, ${ctx.left} ${ctx.cy + 10}`,
+      'rgba(68,136,255,0.12)', 'ah-amber'
+    );
+  }
+
+  // Vertical: Exercise → AI Companion
+  const ai = pos('n-ai');
+  if (ex && ai) line(ex.cx, ex.bottom, ai.cx, ai.top, ac, 'ah-amber');
+
+  // Vertical: AI → Context
+  if (ai && ctx) line(ai.cx, ai.bottom, ctx.cx, ctx.top, ac, 'ah-amber');
+
+  // Vertical: Context → Voice
+  const vc = pos('n-voice');
+  if (ctx && vc) line(ctx.cx, ctx.bottom, vc.cx, vc.top, ac, 'ah-amber');
+
+  // Vertical: Voice → Triggers
+  const tg = pos('n-triggers');
+  if (vc && tg) line(vc.cx, vc.bottom, tg.cx, tg.top, 'rgba(255,170,0,0.12)', null);
+});
+</script>
+
+</body>
+</html>

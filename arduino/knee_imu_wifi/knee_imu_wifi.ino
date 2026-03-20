@@ -1,8 +1,8 @@
 /*
- * Knee IMU BLE — XIAO ESP32S3 + MPU-6050
+ * Knee IMU WiFi — XIAO ESP32S3 + MPU-6050
  *
  * Reads MPU-6050 accelerometer + gyroscope at 50Hz
- * and streams 12-byte packets over BLE notifications.
+ * and streams 12-byte packets over WebSocket.
  *
  * Uses raw I2C registers (no Adafruit library) to avoid
  * Wire.begin() pin conflicts on XIAO ESP32S3.
@@ -13,7 +13,7 @@
  *   MPU-6050 SDA → D4 (GPIO5)
  *   MPU-6050 SCL → D5 (GPIO6)
  *
- * Packet format (little-endian):
+ * Packet format (little-endian, same as BLE version):
  *   [0-1]  accelX  (int16, milli-g)
  *   [2-3]  accelY  (int16, milli-g)
  *   [4-5]  accelZ  (int16, milli-g)
@@ -23,17 +23,26 @@
  *
  * Mount: right shin, just below knee.
  * Board Y-axis perpendicular to sagittal plane (pitch = knee flexion).
+ *
+ * ──────────────────────────────────────────────────────
+ *  TO REVERT TO BLE: flash arduino/knee_imu_ble/knee_imu_ble.ino
+ *  and revert lib/imu-sensor.js from lib/imu-sensor-ble.js
+ * ──────────────────────────────────────────────────────
  */
 
-#include <BLEDevice.h>
-#include <BLEServer.h>
-#include <BLEUtils.h>
-#include <BLE2902.h>
+#include <WiFi.h>
+#include <WebSocketsServer.h>
 #include <Wire.h>
 
-// BLE UUIDs
-#define SERVICE_UUID        "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
-#define CHARACTERISTIC_UUID "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
+// ════════════════════════════════════════════════════════
+//  WiFi credentials — change these when switching networks
+// ════════════════════════════════════════════════════════
+const char* WIFI_SSID = "Yuyang's iPhone (3)";
+const char* WIFI_PASS = "qawsed123";
+// ════════════════════════════════════════════════════════
+
+// WebSocket server on port 81
+WebSocketsServer webSocket = WebSocketsServer(81);
 
 // Timing
 #define NOTIFY_INTERVAL_MS 20  // 50Hz
@@ -51,11 +60,9 @@
 #define REG_CONFIG     0x1A
 #define REG_ACCEL_XOUT 0x3B
 
-// BLE objects
-BLEServer* pServer = nullptr;
-BLECharacteristic* pCharacteristic = nullptr;
-bool deviceConnected = false;
-bool oldDeviceConnected = false;
+// State
+bool clientConnected = false;
+uint8_t clientNum = 0;
 unsigned long lastNotifyTime = 0;
 
 // --- Raw I2C helpers ---
@@ -74,23 +81,30 @@ uint8_t readReg(uint8_t reg) {
     return Wire.read();
 }
 
-// Connection callbacks
-class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-        deviceConnected = true;
-        Serial.println("BLE client connected");
+// WebSocket event handler
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t* payload, size_t length) {
+    switch (type) {
+        case WStype_DISCONNECTED:
+            Serial.printf("WebSocket client [%u] disconnected\n", num);
+            clientConnected = false;
+            break;
+        case WStype_CONNECTED:
+            Serial.printf("WebSocket client [%u] connected\n", num);
+            clientConnected = true;
+            clientNum = num;
+            break;
+        case WStype_TEXT:
+            // Could handle commands here if needed
+            break;
+        default:
+            break;
     }
-
-    void onDisconnect(BLEServer* pServer) {
-        deviceConnected = false;
-        Serial.println("BLE client disconnected");
-    }
-};
+}
 
 void setup() {
     Serial.begin(115200);
     delay(2000);
-    Serial.println("Knee IMU BLE starting...");
+    Serial.println("Knee IMU WiFi starting...");
 
     // Init I2C with explicit pins
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -119,28 +133,35 @@ void setup() {
 
     Serial.println("  Accel: +-8G  Gyro: +-500dps  Filter: 21Hz");
 
-    // Init BLE
-    BLEDevice::init("KneeSensor");
-    pServer = BLEDevice::createServer();
-    pServer->setCallbacks(new ServerCallbacks());
+    // Connect to WiFi
+    Serial.printf("Connecting to WiFi '%s'...\n", WIFI_SSID);
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    WiFi.setAutoReconnect(true);
 
-    // Create service + characteristic
-    BLEService* pService = pServer->createService(SERVICE_UUID);
-    pCharacteristic = pService->createCharacteristic(
-        CHARACTERISTIC_UUID,
-        BLECharacteristic::PROPERTY_NOTIFY
-    );
-    pCharacteristic->addDescriptor(new BLE2902());
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
 
-    // Start service and advertising
-    pService->start();
-    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(SERVICE_UUID);
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x12);  // 22.5ms min interval (was 7.5ms — too aggressive)
-    pAdvertising->setMaxPreferred(0x24);  // 45ms max interval — stable for 50Hz notify
-    BLEDevice::startAdvertising();
-    Serial.println("BLE advertising started — waiting for connection...");
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println();
+        Serial.println("════════════════════════════════════════");
+        Serial.print("  WiFi connected! IP: ");
+        Serial.println(WiFi.localIP());
+        Serial.println("  WebSocket server on port 81");
+        Serial.printf("  Connect from browser: ws://%s:81\n", WiFi.localIP().toString().c_str());
+        Serial.println("════════════════════════════════════════");
+    } else {
+        Serial.println("\nWiFi connection FAILED — sensor will still print to serial");
+    }
+
+    // Start WebSocket server
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+
+    Serial.println("Waiting for WebSocket client...");
 }
 
 // Serial print throttle (print at 5Hz, not 50Hz — keeps monitor readable)
@@ -150,18 +171,20 @@ unsigned long lastPrintTime = 0;
 void loop() {
     unsigned long now = millis();
 
-    // Handle reconnection
-    if (!deviceConnected && oldDeviceConnected) {
-        delay(500);
-        BLEDevice::startAdvertising();
-        Serial.println("Restarted advertising");
-        oldDeviceConnected = deviceConnected;
-    }
-    if (deviceConnected && !oldDeviceConnected) {
-        oldDeviceConnected = deviceConnected;
+    // Handle WebSocket events
+    webSocket.loop();
+
+    // Reconnect WiFi if dropped
+    if (WiFi.status() != WL_CONNECTED) {
+        static unsigned long lastReconnect = 0;
+        if (now - lastReconnect > 5000) {
+            lastReconnect = now;
+            Serial.println("WiFi lost — reconnecting...");
+            WiFi.reconnect();
+        }
     }
 
-    // Read sensor at 50Hz (always, so serial works even without BLE)
+    // Read sensor at 50Hz (always, so serial works even without WiFi)
     if (now - lastNotifyTime >= NOTIFY_INTERVAL_MS) {
         lastNotifyTime = now;
 
@@ -189,7 +212,7 @@ void loop() {
         float gy = (float)rawGy / 65.5f;
         float gz = (float)rawGz / 65.5f;
 
-        // Pack as int16 milli-units
+        // Pack as int16 milli-units (same format as BLE version)
         int16_t data[6];
         data[0] = (int16_t)(ax * 1000.0f);   // milli-g
         data[1] = (int16_t)(ay * 1000.0f);
@@ -198,20 +221,19 @@ void loop() {
         data[4] = (int16_t)(gy * 1000.0f);
         data[5] = (int16_t)(gz * 1000.0f);
 
-        // Send over BLE if connected
-        if (deviceConnected) {
-            pCharacteristic->setValue((uint8_t*)data, 12);
-            pCharacteristic->notify();
+        // Send over WebSocket if client connected
+        if (clientConnected) {
+            webSocket.sendBIN(clientNum, (uint8_t*)data, 12);
         }
 
         // Print to serial at 5Hz
         if (now - lastPrintTime >= PRINT_INTERVAL_MS) {
             lastPrintTime = now;
-            char buf[100];
+            char buf[120];
             snprintf(buf, sizeof(buf),
                 "A: %+7.2fg %+7.2fg %+7.2fg | G: %+7.1f %+7.1f %+7.1f dps%s",
                 ax, ay, az, gx, gy, gz,
-                deviceConnected ? "  [BLE]" : "");
+                clientConnected ? "  [WS]" : "");
             Serial.println(buf);
         }
     }
