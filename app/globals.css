@@ -170,6 +170,42 @@ canvas {
 }
 
 /* =========================================
+   Panel Hide Button
+   ========================================= */
+
+.panel-hide-btn {
+    width: 100%;
+    height: 20px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 0.2s ease;
+    letter-spacing: 2px;
+}
+
+.panel-hide-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+#test-mode-panel.panel-hidden {
+    padding: 10px 16px;
+    width: auto;
+    min-width: 0;
+    gap: 0;
+}
+
+#control-buttons.panel-hidden {
+    padding: 4px 8px;
+    background: none;
+}
+
+/* =========================================
    Test Mode Toggle
    ========================================= */
 
@@ -449,13 +485,13 @@ canvas {
     position: absolute;
     bottom: 32px;
     left: 32px;
-    z-index: 10;
+    z-index: 20;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     opacity: 0.7;
     transition: opacity 0.3s ease;
-    max-width: 300px;
+    width: 220px;
 }
 
 #sensor-hud:hover {
@@ -466,12 +502,23 @@ canvas {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    padding: 14px;
+    background: rgba(10, 10, 14, 0.85);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+}
+
+.sensor-hud-section.imu-section {
+    gap: 12px;
 }
 
 .sensor-hud-divider {
-    height: 1px;
-    background: rgba(255,255,255,0.08);
-    margin: 4px 0;
+    display: none;
 }
 
 .metric {
@@ -487,7 +534,7 @@ canvas {
 }
 
 .metric-bar {
-    width: 60px;
+    flex: 1;
     height: 3px;
     background: rgba(255,255,255,0.1);
     border-radius: 3px;
@@ -538,14 +585,14 @@ canvas {
 .imu-angle-gauge {
     position: relative;
     width: 72px;
-    height: 48px;
+    height: 56px;
 }
 
 .imu-angle-value {
     position: absolute;
-    bottom: 2px;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -20%);
     text-align: center;
     line-height: 1;
 }
@@ -571,6 +618,7 @@ canvas {
 }
 
 .imu-tremor-bar {
+    flex: none;
     width: 100%;
 }
 
@@ -601,7 +649,7 @@ canvas {
 .imu-raw-col {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
 }
 
 .imu-raw-label {
@@ -620,19 +668,19 @@ canvas {
     letter-spacing: 0.5px;
 }
 
-/* Rolling graph */
-.imu-graph-section {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+/* Rolling graph card */
+.imu-graph-card {
+    gap: 8px;
 }
 
 .imu-rolling-graph {
     width: 100%;
-    height: 60px;
+    height: 52px;
     border-radius: 4px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: block;
+    box-sizing: border-box;
 }
 
 /* =========================================
@@ -737,6 +785,116 @@ canvas {
     margin-top: 8px;
     display: flex;
     gap: 12px;
+}
+
+/* =========================================
+   Video Card (thumbnail — bottom left)
+   ========================================= */
+
+.video-card {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 100;
+    width: 180px;
+    cursor: pointer;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.video-card:hover {
+    border-color: var(--glass-highlight);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.video-card-thumb {
+    width: 100%;
+    display: block;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    border-radius: 10px 10px 0 0;
+    opacity: 0.85;
+}
+
+.video-card:hover .video-card-thumb {
+    opacity: 1;
+}
+
+.video-card-label {
+    padding: 6px 10px;
+    font-size: 10px;
+    font-family: var(--font-pixel);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* =========================================
+   Video Modal (Framer Motion layoutId)
+   ========================================= */
+
+.video-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.video-modal-glass {
+    position: fixed;
+    top: calc(50vh - min(calc(90vw * 0.5625 + 16px), calc(1280px * 0.5625 + 16px)) / 2);
+    left: calc(50vw - min(90vw, 1280px) / 2);
+    width: min(90vw, 1280px);
+    z-index: 1000;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.video-modal-close {
+    position: absolute;
+    top: -36px;
+    right: 0px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--glass-border);
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(10px);
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+.video-modal-close:hover {
+    color: var(--text-main);
+    border-color: var(--glass-highlight);
+}
+
+.video-modal-frame {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.video-modal-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
 }
 
 /* =========================================
@@ -925,7 +1083,7 @@ canvas {
 
 #hud-voice-indicator {
     display: flex;
-    align-items: center;
+    flex-direction: column;
     gap: 8px;
     font-size: 10px;
     text-transform: uppercase;
@@ -946,6 +1104,39 @@ canvas {
     background: #a78bfa;
     box-shadow: 0 0 8px rgba(167, 139, 250, 0.6);
     animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+/* =========================================
+   Audio Visualizer Grid
+   ========================================= */
+
+.viz-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.viz-grid {
+    display: grid;
+    gap: 6px;
+    width: 100%;
+}
+
+.viz-grid-cell {
+    width: 60%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.1;
+    place-self: center;
+    transition: opacity 0.08s ease-out;
+}
+
+.viz-grid-cell[data-highlighted="true"] {
+    opacity: 1;
+    box-shadow: 0 0 4px currentColor;
 }
 
 /* =========================================

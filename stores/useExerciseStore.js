@@ -7,6 +7,9 @@ const useExerciseStore = create((set) => ({
     formCue: '',
     aiText: '',
     isSpeaking: false,
+    voiceAnalyser: null,
+
+    setVoiceAnalyser: (analyser) => set({ voiceAnalyser: analyser }),
 
     updateFromState: (exState, isSpeaking) => {
         set({

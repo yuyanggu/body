@@ -29,6 +29,9 @@ export default function HomePage() {
         aiCompanionRef.current.onTextUpdate = (text) => {
             useExerciseStore.getState().setAiText(text);
         };
+        aiCompanionRef.current.voice.onAnalyserReady = (analyser) => {
+            useExerciseStore.getState().setVoiceAnalyser(analyser);
+        };
 
         const stored = typeof localStorage !== 'undefined' && localStorage.getItem('openai_api_key');
         if (stored) {

@@ -50,11 +50,12 @@ npm run dev
 |---|---|
 | `components/SceneCanvas.jsx` | Three.js scene, animation loop, dual GPU particle pipelines (Layer A + B) — renders one `<canvas>`, never re-renders |
 | `components/ExerciseOverlay.jsx` | Exercise card grid + selection |
-| `components/ExerciseHUD.jsx` | Reps, angle, form cue, AI text, voice indicator |
+| `components/ExerciseHUD.jsx` | Reps, angle, form cue, AI text, audio visualizer grid |
+| `components/AudioVisualizerGrid.jsx` | Grid audio visualizer for AI voice — real-time frequency analysis via Web Audio API AnalyserNode. Speaking state: per-column frequency bands highlight cells outward from center row. Thinking state: horizontal scan line sweeps across middle row. Inspired by `@agents-ui/agent-audio-visualizer-grid` (LiveKit), standalone implementation with no LiveKit dependency. |
 | `components/SensorHUD.jsx` | Unified bottom-left HUD — body metrics (Motion/Range/Energy) + IMU sensor data (raw accel/gyro, knee angle gauge, tremor bar, rolling graph). Expands when IMU connected. |
 | `components/WebcamPreview.jsx` | Video element + tracking status dot |
-| `components/ControlButtons.jsx` | Freeze, reset, end session |
-| `components/TestModePanel.jsx` | Toggle switches for test mode, keypoints, data overlay |
+| `components/ControlButtons.jsx` | Freeze, reset, end session — hidden by default, expandable via hide button |
+| `components/TestModePanel.jsx` | Toggle switches for test mode, keypoints, data overlay — hidden by default, expandable via hide button |
 | `components/ApiKeyModal.jsx` | API key entry modal |
 | `components/LoadingOverlay.jsx` | Loading state with progress bar |
 | `components/TestingStatusPanel.jsx` | FPS, particle count, camera/tracking status (testing page only) |
@@ -67,7 +68,7 @@ npm run dev
 | `stores/useAppStore.js` | Config state: paused, appMode, testMode, showKeypoints, loading |
 | `stores/useBodyStore.js` | Body metrics: isTracking, velocity, range, jitter (updated ~5Hz from animation loop) |
 | `stores/useIMUStore.js` | IMU sensor state: connected, accel/gyro XYZ, tremor, kneeAngle (updated ~5Hz from animation loop) |
-| `stores/useExerciseStore.js` | Exercise state: name, reps, angle, formCue, aiText, isSpeaking |
+| `stores/useExerciseStore.js` | Exercise state: name, reps, angle, formCue, aiText, isSpeaking, voiceAnalyser (Web Audio API AnalyserNode for audio visualization) |
 
 ### Core Modules (`lib/`)
 
@@ -83,7 +84,7 @@ Imperative core — these run inside refs/useEffect, not React state. Unchanged 
 | `lib/test-mode.js` | Synthetic animated standing pose for development |
 | `lib/exercises.js` | 6 ACL recovery exercises — angle tracking, rep counting, form quality (0-1) |
 | `lib/ai-companion.js` | Contemplative AI observer — triggers on milestones, speaks 1-2 sentences |
-| `lib/voice.js` | OpenAI TTS wrapper — queue management, Nova voice at 0.98x speed |
+| `lib/voice.js` | OpenAI TTS wrapper — queue management, Nova voice at 0.98x speed. Creates Web Audio API `AudioContext` + `AnalyserNode` on first speak, routes each TTS `Audio` element through it for real-time frequency visualization. Exposes `analyser` getter and `onAnalyserReady` callback. |
 | `lib/data-overlay.js` | 2D canvas overlay showing live body tracking telemetry |
 | `lib/imu-sensor.js` | WebSocket connection to knee IMU sensor — auto-reconnect (500ms, 100 attempts), complementary filter for knee angle, tremor from accel stddev |
 | `lib/imu-sensor-ble.js` | **BLE backup** — copy over `imu-sensor.js` to revert to BLE transport |
@@ -154,7 +155,7 @@ The `SceneCanvas` component mounts once and starts a `requestAnimationFrame` loo
 
 Mode state machine: `select` → `exercise` → back to `select`
 
-Pose detection: MoveNet runs every frame on 640x480 video, outputs 17 keypoints with confidence scores. Smoothed with exponential moving average (SMOOTHING_FACTOR = 0.65). Confidence threshold: 0.3.
+Pose detection: MoveNet runs every frame on 640x480 video, outputs 17 keypoints with confidence scores. Smoothed with exponential moving average (SMOOTHING_FACTOR = 0.65). Confidence threshold: 0.3. Low-confidence keypoints hold their last known position with decaying confidence (0.95x/frame) rather than disappearing — prevents particle dropout during floor exercises. Recovering keypoints use a gradual blend-in (`_recoveryBlend` ramps 0→1 over ~50 frames) to avoid jarring snaps.
 
 ## GPU Particle System — Dual Layer Architecture
 
@@ -273,11 +274,11 @@ The `ShaderControlPanel` component has a copy button that diffs current values a
 
 ## UI
 
-- Test mode toggle panel (top-right): Synthetic Body on/off, Show Keypoints on/off
+- Test mode toggle panel (top-right): Synthetic Body on/off, Show Keypoints on/off — hidden by default with "● ● ●" expand button
 - Shader control panels (testing page, right side): Layer A (purple accent) and Layer B (blue accent), each with independent sliders for all particle/shader params. Layer B includes a GPU grid size slider for particle count.
 - Webcam preview (bottom-left): live camera feed with tracking status dot
 - Sensor HUD (bottom-left): Motion/Range/Energy bars + IMU section (knee angle gauge, tremor bar, raw accel/gyro, rolling angle graph) — IMU section appears only when sensor connected
-- Control buttons (bottom-right): Freeze, Skeleton, Reset, End Session
+- Control buttons (bottom-center): Freeze, Reset, End Session — hidden by default with "● ● ●" expand button
 - Exercise overlay: card grid for 6 ACL exercises
 - Frosted glass aesthetic (backdrop-filter blur) throughout
 

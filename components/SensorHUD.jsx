@@ -8,37 +8,35 @@ import useIMUStore from '../stores/useIMUStore.js';
 const GRAPH_BUFFER_SIZE = 50;
 
 function AngleGauge({ angle }) {
-    // Arc gauge from 0-135 degrees
     const maxAngle = 135;
     const clamped = Math.min(angle, maxAngle);
-    const radius = 28;
+    const fraction = clamped / maxAngle;
+
+    const radius = 24;
     const cx = 36;
-    const cy = 38;
+    const cy = 34;
+    // Screen-space angles (0°=right, clockwise positive, Y-down)
+    const startDeg = 150; // 8 o'clock position (lower-left)
+    const totalSweep = 240; // 240° arc through the top to 4 o'clock (lower-right)
 
-    // Arc starts at bottom-left (225°) sweeps to bottom-right (315°) = 90° visual arc
-    // Map knee angle 0-135 to sweep 0-180°
-    const startAngleRad = (Math.PI * 3) / 4; // 135° from right (bottom-left)
-    const sweepFraction = clamped / maxAngle;
-    const endAngleRad = startAngleRad + sweepFraction * Math.PI;
+    const toXY = (deg) => {
+        const rad = (deg * Math.PI) / 180;
+        return [cx + radius * Math.cos(rad), cy + radius * Math.sin(rad)];
+    };
 
-    const x1 = cx + radius * Math.cos(startAngleRad);
-    const y1 = cy + radius * Math.sin(startAngleRad);
-    const x2 = cx + radius * Math.cos(endAngleRad);
-    const y2 = cy + radius * Math.sin(endAngleRad);
+    const [sx, sy] = toXY(startDeg);
+    const [ex, ey] = toXY(startDeg + totalSweep);
 
-    const largeArc = sweepFraction > 0.5 ? 1 : 0;
-
-    // Background arc (full range)
-    const bgEndRad = startAngleRad + Math.PI;
-    const bgX2 = cx + radius * Math.cos(bgEndRad);
-    const bgY2 = cy + radius * Math.sin(bgEndRad);
+    const activeSweep = fraction * totalSweep;
+    const [ax, ay] = toXY(startDeg + activeSweep);
+    const activeLargeArc = activeSweep > 180 ? 1 : 0;
 
     return (
         <div className="imu-angle-gauge">
-            <svg width="72" height="48" viewBox="0 0 72 48">
-                {/* Background arc */}
+            <svg width="72" height="56" viewBox="0 0 72 56">
+                {/* Background arc — full gauge range */}
                 <path
-                    d={`M ${x1} ${y1} A ${radius} ${radius} 0 1 1 ${bgX2} ${bgY2}`}
+                    d={`M ${sx} ${sy} A ${radius} ${radius} 0 1 1 ${ex} ${ey}`}
                     fill="none"
                     stroke="rgba(255,255,255,0.08)"
                     strokeWidth="3"
@@ -47,7 +45,7 @@ function AngleGauge({ angle }) {
                 {/* Active arc */}
                 {clamped > 0.5 && (
                     <path
-                        d={`M ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2}`}
+                        d={`M ${sx} ${sy} A ${radius} ${radius} 0 ${activeLargeArc} 1 ${ax} ${ay}`}
                         fill="none"
                         stroke="url(#angleGradient)"
                         strokeWidth="3"
@@ -145,12 +143,26 @@ function RollingGraph({ bufferRef }) {
         };
     }, [draw]);
 
+    // Resize canvas to match container width
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const resizeObserver = new ResizeObserver(([entry]) => {
+            const w = Math.floor(entry.contentRect.width);
+            if (w > 0 && canvas.width !== w) {
+                canvas.width = w;
+            }
+        });
+        resizeObserver.observe(canvas);
+        return () => resizeObserver.disconnect();
+    }, []);
+
     return (
         <canvas
             ref={canvasRef}
             className="imu-rolling-graph"
-            width={280}
-            height={60}
+            width={196}
+            height={52}
         />
     );
 }
@@ -220,56 +232,54 @@ export default function SensorHUD() {
 
             {/* IMU section — only when connected */}
             {connected && (
-                <>
-                    <div className="sensor-hud-divider"></div>
+                <div className="sensor-hud-section imu-section">
+                    <div className="imu-header">
+                        <span className="imu-dot"></span>
+                        <span>KNEE IMU</span>
+                    </div>
 
-                    <div className="sensor-hud-section">
-                        <div className="imu-header">
-                            <span className="imu-dot"></span>
-                            <span>KNEE IMU</span>
-                        </div>
-
-                        {/* Angle gauge + tremor */}
-                        <div className="imu-main-row">
-                            <AngleGauge angle={kneeAngle} />
-                            <div className="imu-tremor-block">
-                                <span className="imu-label">Tremor</span>
-                                <div className="metric-bar imu-tremor-bar">
-                                    <div
-                                        className="metric-fill imu-tremor-fill"
-                                        style={{
-                                            width: `${tremor * 100}%`,
-                                            background: tremorColor,
-                                        }}
-                                    ></div>
-                                </div>
-                                <span className="imu-tremor-value">{(tremor * 100).toFixed(0)}%</span>
+                    {/* Angle gauge + tremor */}
+                    <div className="imu-main-row">
+                        <AngleGauge angle={kneeAngle} />
+                        <div className="imu-tremor-block">
+                            <span className="imu-label">Tremor</span>
+                            <div className="metric-bar imu-tremor-bar">
+                                <div
+                                    className="metric-fill imu-tremor-fill"
+                                    style={{
+                                        width: `${tremor * 100}%`,
+                                        background: tremorColor,
+                                    }}
+                                ></div>
                             </div>
-                        </div>
-
-                        {/* Raw data */}
-                        <div className="imu-raw-grid">
-                            <div className="imu-raw-col">
-                                <span className="imu-raw-label">ACCEL</span>
-                                <span className="imu-raw-val">{fmt(accelX)}</span>
-                                <span className="imu-raw-val">{fmt(accelY)}</span>
-                                <span className="imu-raw-val">{fmt(accelZ)}</span>
-                            </div>
-                            <div className="imu-raw-col">
-                                <span className="imu-raw-label">GYRO</span>
-                                <span className="imu-raw-val">{fmt(gyroX)}</span>
-                                <span className="imu-raw-val">{fmt(gyroY)}</span>
-                                <span className="imu-raw-val">{fmt(gyroZ)}</span>
-                            </div>
-                        </div>
-
-                        {/* Rolling graph */}
-                        <div className="imu-graph-section">
-                            <span className="imu-label">Angle History</span>
-                            <RollingGraph bufferRef={angleBufferRef} />
+                            <span className="imu-tremor-value">{(tremor * 100).toFixed(0)}%</span>
                         </div>
                     </div>
-                </>
+
+                    {/* Raw data */}
+                    <div className="imu-raw-grid">
+                        <div className="imu-raw-col">
+                            <span className="imu-raw-label">ACCEL</span>
+                            <span className="imu-raw-val">{fmt(accelX)}</span>
+                            <span className="imu-raw-val">{fmt(accelY)}</span>
+                            <span className="imu-raw-val">{fmt(accelZ)}</span>
+                        </div>
+                        <div className="imu-raw-col">
+                            <span className="imu-raw-label">GYRO</span>
+                            <span className="imu-raw-val">{fmt(gyroX)}</span>
+                            <span className="imu-raw-val">{fmt(gyroY)}</span>
+                            <span className="imu-raw-val">{fmt(gyroZ)}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Rolling graph — separate card below IMU */}
+            {connected && (
+                <div className="sensor-hud-section imu-graph-card">
+                    <span className="imu-label">Angle History</span>
+                    <RollingGraph bufferRef={angleBufferRef} />
+                </div>
             )}
         </div>
     );

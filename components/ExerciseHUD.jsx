@@ -2,6 +2,7 @@
 
 import useAppStore from '../stores/useAppStore.js';
 import useExerciseStore from '../stores/useExerciseStore.js';
+import AudioVisualizerGrid from './AudioVisualizerGrid.jsx';
 
 export default function ExerciseHUD() {
     const appMode = useAppStore((s) => s.appMode);
@@ -11,6 +12,7 @@ export default function ExerciseHUD() {
     const formCue = useExerciseStore((s) => s.formCue);
     const aiText = useExerciseStore((s) => s.aiText);
     const isSpeaking = useExerciseStore((s) => s.isSpeaking);
+    const voiceAnalyser = useExerciseStore((s) => s.voiceAnalyser);
 
     if (appMode !== 'exercise') return null;
 
@@ -27,9 +29,16 @@ export default function ExerciseHUD() {
             </div>
             <div id="hud-form-cue">{formCue}</div>
             <div id="hud-ai-text">{aiText}</div>
-            <div id="hud-voice-indicator" className={isSpeaking ? '' : 'hidden'}>
-                <span className="voice-dot"></span>
-                <span>Speaking</span>
+            <div id="hud-voice-indicator">
+                <AudioVisualizerGrid
+                    analyser={voiceAnalyser}
+                    state={isSpeaking ? 'speaking' : 'thinking'}
+                    rowCount={7}
+                    columnCount={20}
+                    radius={20}
+                    interval={120}
+                    color="#a78bfa"
+                />
             </div>
         </div>
     );

@@ -203,7 +203,11 @@ export default function SceneCanvas({ exerciseAnalyzer, aiCompanion, enableExerc
 
             if (Math.floor(t * 10) % 2 === 0) {
                 useBodyStore.getState().updateMetrics(bodyState);
-                useIMUStore.getState().updateFromIMU(imuState);
+                // Only push real IMU state if the real sensor is connected,
+                // otherwise simulated IMU data (from TestModePanel) would be overwritten
+                if (imuState.connected) {
+                    useIMUStore.getState().updateFromIMU(imuState);
+                }
             }
         }
 
