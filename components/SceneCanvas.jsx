@@ -93,7 +93,7 @@ export default function SceneCanvas({ exerciseAnalyzer, aiCompanion, enableExerc
 
         const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, antialias: true, powerPreference: 'high-performance' });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         renderer.setClearColor(0x000000);
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         rendererRef.current = renderer;
@@ -135,12 +135,14 @@ export default function SceneCanvas({ exerciseAnalyzer, aiCompanion, enableExerc
         const clock = new THREE.Clock();
         let prevTime = 0;
         let animFrameId = null;
+        let frameCount = 0;
 
         function animate() {
             animFrameId = requestAnimationFrame(animate);
             const t = clock.getElapsedTime();
             const dt = Math.min(t - prevTime, .05);
             prevTime = t;
+            frameCount++;
 
             // Skip heavy rendering when video modal is open
             if (config.videoOpen) {
@@ -149,11 +151,14 @@ export default function SceneCanvas({ exerciseAnalyzer, aiCompanion, enableExerc
                 return;
             }
 
+            // Throttle pose detection to every 3rd frame (~20fps at 60fps)
             if (config.testMode) {
-                const testKps = generateTestKeypoints(t);
-                processKeypoints(testKps);
+                if (frameCount % 3 === 0) {
+                    const testKps = generateTestKeypoints(t);
+                    processKeypoints(testKps);
+                }
             } else {
-                detectPose();
+                if (frameCount % 3 === 0) detectPose();
             }
 
             updateKeypointOverlay(keypointOverlay, config, bodyState);
