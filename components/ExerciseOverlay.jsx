@@ -7,6 +7,7 @@ import useExerciseStore from '../stores/useExerciseStore.js';
 import { EXERCISES } from '../lib/exercises.js';
 import { connectSensor, disconnectSensor, autoConnect, getStoredSensorIP, getKnownIPs } from '../lib/imu-sensor.js';
 import { imuState } from '../lib/imu-sensor.js';
+import { config } from '../lib/config.js';
 import ApiKeyModal from './ApiKeyModal.jsx';
 
 const VIDEO_ID = 'I8JUDhA6rXM';
@@ -81,7 +82,11 @@ export default function ExerciseOverlay({ exerciseAnalyzer, aiCompanion }) {
         }
     };
 
-    const [videoOpen, setVideoOpen] = useState(false);
+    const [videoOpen, _setVideoOpen] = useState(false);
+    const setVideoOpen = (open) => {
+        config.videoOpen = open;
+        _setVideoOpen(open);
+    };
 
     if (appMode !== 'select') return null;
 

@@ -142,6 +142,13 @@ export default function SceneCanvas({ exerciseAnalyzer, aiCompanion, enableExerc
             const dt = Math.min(t - prevTime, .05);
             prevTime = t;
 
+            // Skip heavy rendering when video modal is open
+            if (config.videoOpen) {
+                controls.update();
+                renderer.render(scene, camera);
+                return;
+            }
+
             if (config.testMode) {
                 const testKps = generateTestKeypoints(t);
                 processKeypoints(testKps);
